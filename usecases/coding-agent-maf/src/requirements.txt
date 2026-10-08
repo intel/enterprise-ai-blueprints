@@ -1,0 +1,40 @@
+# Agent Framework Core
+agent-framework-core==1.19.0
+
+# Agent Framework Extensions
+agent-framework-devui==1.0.0b260918    # Web UI for testing agents
+agent-framework-redis==1.0.0b260918    # Redis-based context provider for memory
+agent-framework-openai==1.14.4         # OpenAI-compatible API integration for chat completions
+
+# OpenAI (for OpenAI-compatible chat completions)
+# >=2.45.0,<4 is required by agent-framework-devui/-openai.
+openai==3.16.2
+
+# Redis Vector Library.
+# Pinned <0.16 to satisfy agent-framework-redis (requires redisvl<0.16,>=0.11.0).
+redisvl==0.15.0
+
+# Agent Sandbox — isolated code execution in Kubernetes sandbox pods
+k8s-agent-sandbox==0.4.6
+# Pin kubernetes client to 35.x — v36.0.0 has a bug where load_incluster_config()
+# stores the bearer token under api_key['authorization'] but auth_settings() looks
+# for api_key['BearerToken'], so requests go out as system:anonymous inside a pod.
+kubernetes==35.0.0
+
+# Utilities
+python-dotenv==1.2.3
+
+# Ray — distributed parallel task execution (optional; only used when
+# RAY_ENABLED=true, otherwise the agent falls back to sequential execution).
+# Pinned to 2.56.0 to patch CVE-2023-6019 and the 2025/2026 Ray advisories;
+# this also refreshes the bundled jackson-databind / org.apache jars flagged by
+# the image scan. When RAY_ENABLED=true the KubeRay cluster image must match this
+# client version: set rayImage in agentic-config.cfg to
+# rayproject/ray:2.56.0-py312 (was rayproject/ray:2.40.0-py312).
+ray[default]>=2.56.0
+# aiohttp is pulled in transitively by ray[default]; pin the patched release
+# (CVE-2025/CVE-2026 aiohttp advisories are fixed in 3.14.3; ray needs >=3.13.3).
+aiohttp>=3.14.3
+
+# Observability
+langfuse==4.15.4

@@ -1,0 +1,71 @@
+# Git ignore for Agentic AI Stack — Use Cases
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+*.whl
+.venv/
+venv/
+env/
+.env
+.env.*
+config.local.env
+!.env.example
+!config.env
+
+# Node / JS
+node_modules/
+npm-debug.log*
+
+# Helm
+*.tgz
+charts/
+
+# Kubernetes secrets — never commit these
+*-secret.yaml
+*-values-secret.yaml
+kubeconfig
+*.kubeconfig
+
+# TLS / certs — never commit private keys
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+certs/
+
+# Docker
+.docker/
+
+# IDE / editors
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+deploy.log
+
+# Test artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Temporary files
+tmp/
+temp/
+*.tmp

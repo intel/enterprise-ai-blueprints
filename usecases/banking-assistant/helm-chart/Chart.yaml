@@ -1,0 +1,17 @@
+apiVersion: v2
+name: banking-assistant
+description: Banking Assistant agent with a FastMCP banking tools sidecar, DevUI, and Redis memory
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - agent
+  - banking
+  - mcp
+  - redis
+  - devui
+maintainers:
+  - name: banking-assistant
+
+# No sub-chart dependencies — Redis is deployed as a standalone StatefulSet
+# in the 'redis' namespace via the core stack. Set redisUrl in values.yaml.

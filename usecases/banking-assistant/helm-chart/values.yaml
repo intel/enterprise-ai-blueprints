@@ -1,0 +1,118 @@
+# Default values for banking-assistant.
+# Override these in a values file or with --set on the command line.
+
+# ---------------------------------------------------------------------------
+# ServiceAccount
+# Dedicated ServiceAccount for the banking-assistant pod. No RBAC is needed —
+# unlike coding-agent there is no Kubernetes sandbox to manage.
+# ---------------------------------------------------------------------------
+serviceAccount:
+  create: true
+
+# ---------------------------------------------------------------------------
+# Banking Assistant agent (container 1)
+# ---------------------------------------------------------------------------
+agent:
+  replicaCount: 1
+
+  image:
+    repository: banking-assistant   # Replace with your registry/image, e.g. ghcr.io/myorg/banking-assistant
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  # LLM configuration – openaiApiKey is required
+  openaiApiKey: ""            # REQUIRED – set via --set or a separate secret values file
+  devuiAuthToken: ""          # REQUIRED – auth token for DevUI when bound to non-loopback host
+  openaiBaseUrl: "http://genai-gateway-service.genai-gateway.svc.cluster.local:4000/v1"
+  # Langfuse observability (optional)
+  langfusePublicKey: ""
+  langfuseSecretKey: ""
+  langfuseHost: ""              # -> LANGFUSE_HOST (the SDK's env var)
+  langfuseEnableSensitiveData: "true"
+  # modelName must be a model ID registered in LiteLLM and must support tool/function
+  # calling for the MCP tools to be invoked, e.g. Qwen/Qwen3-Coder-30B-A3B-Instruct.
+  modelName: ""   # REQUIRED – set at deploy time
+
+  # URL of the banking MCP server. In the sidecar topology this is loopback.
+  mcpServerUrl: "http://localhost:8000/mcp"
+
+  # Enable text-only Redis conversational memory
+  enableMemory: "true"
+
+  # Proxy bypass list – cluster-internal traffic must not go through the corporate proxy
+  noProxy: "localhost,127.0.0.1,intel.com,.svc,.svc.cluster.local,.default.svc.cluster.local,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+
+  service:
+    type: ClusterIP
+    port: 8090
+    # nodePort: 30090   # Uncomment when type is NodePort
+
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+  # Node affinity — schedule on inference-eligible worker nodes.
+  # Set to {} to disable and allow scheduling on any node.
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: ei-inference-eligible
+                operator: In
+                values: ["true"]
+
+# ---------------------------------------------------------------------------
+# Banking MCP server (container 2 — sidecar in the same pod)
+# Serves banking tools over Streamable HTTP on port 8000. Backed by synthetic
+# in-memory data only; not exposed via a Service (agent reaches it on loopback).
+# ---------------------------------------------------------------------------
+mcp:
+  image:
+    repository: banking-mcp   # Replace with your registry/image
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  port: 8000
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+
+  # Container hardening for the MCP sidecar is set as a literal securityContext
+  # directly in templates/deployment.yaml (so static IaC scanners can verify it).
+
+# ---------------------------------------------------------------------------
+# External Redis URL
+# Provide this to point at the shared Redis deployed in the 'redis' namespace.
+# ---------------------------------------------------------------------------
+redisUrl: "redis://redis-stack-server.redis.svc.cluster.local:6379"
+
+# ---------------------------------------------------------------------------
+# Ingress
+# Enable to expose the Banking Assistant via the ingress controller.
+# ---------------------------------------------------------------------------
+ingress:
+  enabled: false
+  className: nginx
+  host: ""            # e.g. banking-assistant.api.example.com
+  path: /
+  pathType: Prefix
+  tls:
+    enabled: false
+    secretName: ""    # TLS secret in the banking-assistant namespace
+  annotations: {}
+
+# ---------------------------------------------------------------------------
+# Chart-wide overrides
+# ---------------------------------------------------------------------------
+nameOverride: ""
+fullnameOverride: ""

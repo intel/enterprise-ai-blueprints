@@ -1,0 +1,7 @@
+# Model Context Protocol SDK — provides mcp.server.fastmcp.FastMCP.
+# NOTE: this is the official `mcp` package, NOT the standalone `fastmcp` project.
+# Pinned <2 to match the Agent Framework's supported range and the agent image.
+mcp==1.30.0
+
+# ASGI server backing the Streamable HTTP transport.
+uvicorn==0.53.0

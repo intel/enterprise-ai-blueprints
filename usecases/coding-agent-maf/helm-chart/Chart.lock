@@ -1,0 +1,6 @@
+dependencies:
+- name: redis-stack-server
+  repository: https://redis-stack.github.io/helm-redis-stack
+  version: 0.4.21
+digest: sha256:4d250c3865ee7d46780d19808d58b322c0486fcbe69bfe4b0a9ad6cdd19eb254
+generated: "2026-04-27T14:32:24.896468201Z"

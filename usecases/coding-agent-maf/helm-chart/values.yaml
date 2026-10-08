@@ -1,0 +1,134 @@
+# Default values for coding-agent.
+# Override these in a values file or with --set on the command line.
+
+# ---------------------------------------------------------------------------
+# ServiceAccount & RBAC
+# Creates a dedicated ServiceAccount for the coding-agent pod and a Role +
+# RoleBinding in the sandbox namespace so the agent can manage SandboxClaims.
+# ---------------------------------------------------------------------------
+serviceAccount:
+  create: true
+  # RBAC letting the agent manage SandboxClaims in the sandbox namespace.
+  sandboxAccess: true
+
+# ---------------------------------------------------------------------------
+# Coding Agent
+# ---------------------------------------------------------------------------
+agent:
+  replicaCount: 1
+
+  image:
+    repository: coding-agent   # Replace with your registry/image, e.g. ghcr.io/myorg/coding-agent
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  # LLM configuration – openaiApiKey is required
+  openaiApiKey: ""            # REQUIRED – set via --set or a separate secret values file
+  devuiAuthToken: ""          # REQUIRED – auth token for DevUI when bound to non-loopback host
+  openaiBaseUrl: "http://genai-gateway-service.genai-gateway.svc.cluster.local:4000/v1"
+  # Langfuse observability (optional)
+  langfusePublicKey: ""
+  langfuseSecretKey: ""
+  langfuseHost: ""              # -> LANGFUSE_HOST (the SDK's env var)
+  langfuseEnableSensitiveData: "true"
+  # modelName is set dynamically by deploy-agentic-stack.sh from the 'models' field in
+  # agentic-config.cfg (e.g. cpu-qwen3-coder-30b -> Qwen/Qwen3-Coder-30B-A3B-Instruct).
+  # For manual Helm installs set this to the model ID registered in LiteLLM:
+  #   helm install coding-agent ./helm-chart --set agent.modelName="Qwen/Qwen3-Coder-30B-A3B-Instruct" ...
+  modelName: ""   # REQUIRED – always injected by deploy script; must be set for manual installs
+
+  # Proxy bypass list – cluster-internal traffic must not go through the corporate proxy
+  noProxy: "localhost,127.0.0.1,intel.com,.svc,.svc.cluster.local,.default.svc.cluster.local,.agent-sandbox-system.svc.cluster.local,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+
+  # Agent Sandbox. Controller/router default namespace is 'agent-sandbox-system'
+  # (verify: kubectl get sandboxtemplate,sandboxwarmpool -A).
+  sandboxNamespace: "agent-sandbox-system"
+  sandboxTemplate: "python-sandbox-template"
+  sandboxWarmPool: "python-pool"          # warm pool to adopt sandboxes from
+  sandboxRouterUrl: "http://sandbox-router-svc.agent-sandbox-system.svc.cluster.local:8080"
+  sandboxRouterToken: ""                   # router bearer token, if auth is enabled
+
+  # Working directory inside the container (must match Dockerfile ENV)
+  workspaceDir: /app/workspace
+
+  service:
+    type: ClusterIP
+    port: 8090
+    # nodePort: 30090   # Uncomment when type is NodePort
+
+  # Workspace PersistentVolumeClaim
+  workspace:
+    size: 5Gi
+    storageClassName: ""   # Leave empty to use the cluster default StorageClass
+
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+  # Node affinity — schedule the Coding Agent on inference-eligible worker nodes.
+  # Set to {} to disable and allow scheduling on any node.
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: ei-inference-eligible
+                operator: In
+                values: ["true"]
+
+# ---------------------------------------------------------------------------
+# External Redis URL (optional)
+# Provide this when redis.enabled=false to point to an existing Redis instance.
+# Example: "redis://my-external-redis:6379"
+# ---------------------------------------------------------------------------
+redisUrl: "redis://redis-stack-server.redis.svc.cluster.local:6379"
+
+# ---------------------------------------------------------------------------
+# Redis (redis-stack-server subchart – alias: redis)
+# Set redis.enabled=false when providing an external redisUrl above.
+# NOTE: Helm cannot derive this flag automatically from redisUrl — both must
+#       be set together. Forgetting redis.enabled=false while setting redisUrl
+#       will cause a hard validation error at render time.
+# Full list of available subchart values:
+#   https://github.com/redis-stack/helm-redis-stack
+# ---------------------------------------------------------------------------
+# Redis sub-chart removed — shared Redis is deployed separately in the 'redis' namespace.
+# Use redisUrl above to connect to it.
+
+# ---------------------------------------------------------------------------
+# Ingress
+# Enable to expose the Coding Agent via the ingress controller.
+# ---------------------------------------------------------------------------
+ingress:
+  enabled: false
+  className: nginx
+  host: ""            # e.g. coding-agent.api.example.com  (subdomain preferred over path-based)
+  path: /
+  pathType: Prefix
+  tls:
+    enabled: false
+    secretName: ""    # TLS secret in the coding-agent namespace (copy from genai-gateway if needed)
+  annotations: {}    # No rewrite needed for subdomain routing
+
+# ---------------------------------------------------------------------------
+# Chart-wide overrides
+# ---------------------------------------------------------------------------
+nameOverride: ""
+fullnameOverride: ""
+
+# ---------------------------------------------------------------------------
+# Ray distributed-computing integration (optional)
+#
+# Enable only when deploy_kuberay=on is set in agentic-config.cfg and the
+# KubeRay operator + RayCluster are running in the cluster.
+#
+# address format: ray://<cluster-name>-head-svc.<namespace>.svc.cluster.local:10001
+#   e.g. ray://ray-cluster-head-svc.ray-system.svc.cluster.local:10001
+# ---------------------------------------------------------------------------
+ray:
+  enabled: false
+  address: ""

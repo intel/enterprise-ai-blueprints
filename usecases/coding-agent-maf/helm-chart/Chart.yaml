@@ -1,0 +1,17 @@
+apiVersion: v2
+name: coding-agent
+description: Coding Agent with local code execution, DevUI, and Redis memory
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - agent
+  - coding
+  - redis
+  - devui
+maintainers:
+  - name: coding-agent
+
+# No sub-chart dependencies — Redis is deployed as a standalone StatefulSet
+# in the 'redis' namespace via core/lib/components/redis-controller.sh.
+# Set redisUrl in values.yaml to point to it.

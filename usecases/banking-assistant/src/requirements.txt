@@ -1,0 +1,29 @@
+# Agent Framework Core
+# Pinned to the version whose MCP client (agent_framework.MCPStreamableHTTPTool)
+# API was verified for this usecase.
+agent-framework-core==1.19.0
+
+# Agent Framework Extensions
+agent-framework-devui==1.0.0b260918    # Web UI for testing agents
+agent-framework-redis==1.0.0b260918    # Redis-based context provider for memory
+agent-framework-openai==1.14.4         # OpenAI-compatible API integration for chat completions
+
+# OpenAI (for OpenAI-compatible chat completions via the GenAI gateway)
+# >=2.45.0,<4 is required by agent-framework-devui/-openai.
+openai==3.16.2
+
+# Model Context Protocol SDK — the Agent Framework's MCPStreamableHTTPTool client
+# imports the `mcp` package at connect time, so it is required in the agent image
+# (not only in the MCP server image). Pinned <2 to match the Agent Framework's
+# supported range (agent-framework-core[all] requires mcp<2,>=1.24.0).
+mcp==1.30.0
+
+# Redis Vector Library (used by the Redis context provider).
+# Pinned <0.16 to satisfy agent-framework-redis (requires redisvl<0.16,>=0.11.0).
+redisvl==0.15.0
+
+# Utilities
+python-dotenv==1.2.3
+
+# Observability
+langfuse==4.15.4

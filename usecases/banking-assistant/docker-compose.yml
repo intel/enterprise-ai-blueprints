@@ -1,0 +1,102 @@
+# Banking Assistant — Local Development Stack
+# Runs the agent + banking MCP server + Redis without Kubernetes.
+# Set LITELLM_URL and LITELLM_API_KEY to point at your running LiteLLM gateway.
+#
+# Usage:
+#   export LITELLM_URL=http://your-host:4000/v1
+#   export LITELLM_API_KEY=sk-your-key
+#   export MODEL_NAME=Qwen/Qwen3-Coder-30B-A3B-Instruct   # must support tool calling
+#   docker compose up --build
+
+services:
+
+  banking-mcp:
+    image: banking-mcp:latest
+    build:
+      context: ./src
+      dockerfile: Dockerfile.mcp
+      args:
+        http_proxy: "${http_proxy:-}"
+        https_proxy: "${https_proxy:-}"
+        no_proxy: "${no_proxy:-}"
+        HTTP_PROXY: "${HTTP_PROXY:-${http_proxy:-}}"
+        HTTPS_PROXY: "${HTTPS_PROXY:-${https_proxy:-}}"
+        NO_PROXY: "${NO_PROXY:-${no_proxy:-}}"
+    container_name: banking-mcp
+    cap_drop:
+      - ALL
+    environment:
+      MCP_HOST: "0.0.0.0"
+      MCP_PORT: "8000"
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import socket; s=socket.socket(); s.connect(('localhost', 8000)); s.close()"]
+      interval: 15s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+
+  banking-assistant:
+    image: banking-assistant:latest
+    build:
+      context: ./src
+      dockerfile: Dockerfile
+      args:
+        http_proxy: "${http_proxy:-}"
+        https_proxy: "${https_proxy:-}"
+        no_proxy: "${no_proxy:-}"
+        HTTP_PROXY: "${HTTP_PROXY:-${http_proxy:-}}"
+        HTTPS_PROXY: "${HTTPS_PROXY:-${https_proxy:-}}"
+        NO_PROXY: "${NO_PROXY:-${no_proxy:-}}"
+    container_name: banking-assistant
+    cap_drop:
+      - ALL
+    ports:
+      - "8090:8090"
+    environment:
+      OPENAI_BASE_URL: "${LITELLM_URL:-http://host.docker.internal:4000/v1}"
+      OPENAI_API_KEY: "${LITELLM_API_KEY:-sk-placeholder}"
+      MODEL_NAME: "${MODEL_NAME:-Qwen/Qwen3-Coder-30B-A3B-Instruct}"
+      MCP_SERVER_URL: "http://banking-mcp:8000/mcp"
+      REDIS_URL: "redis://redis-stack:6379"
+      ENABLE_MEMORY: "true"
+      http_proxy: "${http_proxy:-}"
+      https_proxy: "${https_proxy:-}"
+      # banking-mcp and redis-stack must resolve without the proxy
+      no_proxy: "${no_proxy:-},banking-mcp,redis-stack,localhost,127.0.0.1"
+      HTTP_PROXY: "${HTTP_PROXY:-${http_proxy:-}}"
+      HTTPS_PROXY: "${HTTPS_PROXY:-${https_proxy:-}}"
+      NO_PROXY: "${NO_PROXY:-${no_proxy:-}},banking-mcp,redis-stack,localhost,127.0.0.1"
+    depends_on:
+      banking-mcp:
+        condition: service_healthy
+      redis-stack:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import socket; s=socket.socket(); s.connect(('localhost', 8090)); s.close()"]
+      interval: 30s
+      timeout: 10s
+      start_period: 15s
+      retries: 3
+
+  redis-stack:
+    image: redis/redis-stack-server:7.4.0-v8
+    container_name: banking-assistant-redis
+    cap_drop:
+      - ALL
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  redis-data:

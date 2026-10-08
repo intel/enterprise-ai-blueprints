@@ -1,0 +1,75 @@
+# Coding Agent — Local Development Stack
+# Runs the agent + Redis without Kubernetes.
+# Set LITELLM_URL and LITELLM_API_KEY to point at your running LiteLLM gateway.
+#
+# Usage:
+#   export LITELLM_URL=http://your-host:4000/v1
+#   export LITELLM_API_KEY=sk-your-key
+#   # Proxy values are read from env vars sourced from agentic-config.cfg:
+
+services:
+
+  coding-agent:
+    image: coding-agent:latest        # built by agentic-stack.sh, or build locally below
+    build:
+      context: ./src
+      dockerfile: Dockerfile
+      args:
+        http_proxy: "${http_proxy:-}"
+        https_proxy: "${https_proxy:-}"
+        no_proxy: "${no_proxy:-}"
+        HTTP_PROXY: "${HTTP_PROXY:-${http_proxy:-}}"
+        HTTPS_PROXY: "${HTTPS_PROXY:-${https_proxy:-}}"
+        NO_PROXY: "${NO_PROXY:-${no_proxy:-}}"
+    container_name: coding-agent
+    cap_drop:
+      - ALL
+    ports:
+      - "8090:8090"
+    environment:
+      OPENAI_BASE_URL: "${LITELLM_URL:-http://host.docker.internal:4000/v1}"
+      OPENAI_API_KEY: "${LITELLM_API_KEY:-sk-placeholder}"
+      MODEL_NAME: "openai/Qwen/Qwen2.5-Coder-7B-Instruct"
+      REDIS_URL: "redis://redis-stack:6379"
+      WORKSPACE_DIR: "/app/workspace"
+      SANDBOX_NAMESPACE: "${SANDBOX_NAMESPACE:-agent-sandbox}"
+      SANDBOX_TEMPLATE: "${SANDBOX_TEMPLATE:-python-sandbox-template}"
+      SANDBOX_ROUTER_URL: "${SANDBOX_ROUTER_URL:-http://sandbox-router-svc.agent-sandbox.svc.cluster.local:8080}"
+      http_proxy: "${http_proxy:-}"
+      https_proxy: "${https_proxy:-}"
+      no_proxy: "${no_proxy:-}"
+      HTTP_PROXY: "${HTTP_PROXY:-${http_proxy:-}}"
+      HTTPS_PROXY: "${HTTPS_PROXY:-${https_proxy:-}}"
+      NO_PROXY: "${NO_PROXY:-${no_proxy:-}}"
+    volumes:
+      - coding-agent-workspace:/app/workspace
+    depends_on:
+      redis-stack:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8090/health')"]
+      interval: 30s
+      timeout: 10s
+      start_period: 15s
+      retries: 3
+
+  redis-stack:
+    image: redis/redis-stack-server:7.4.0-v8
+    container_name: coding-agent-redis
+    cap_drop:
+      - ALL
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  coding-agent-workspace:
+  redis-data:
