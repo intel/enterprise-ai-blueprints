@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "coding-agent.fullname" . }}
+  labels:
+    {{- include "coding-agent.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.agent.service.type }}
+  ports:
+    - port: {{ .Values.agent.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+      {{- if and (eq .Values.agent.service.type "NodePort") .Values.agent.service.nodePort }}
+      nodePort: {{ .Values.agent.service.nodePort }}
+      {{- end }}
+  selector:
+    {{- include "coding-agent.selectorLabels" . | nindent 4 }}

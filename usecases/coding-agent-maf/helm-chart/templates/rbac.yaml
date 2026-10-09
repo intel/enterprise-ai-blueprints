@@ -1,0 +1,34 @@
+{{- if and .Values.serviceAccount.create .Values.serviceAccount.sandboxAccess -}}
+# Lets the agent's ServiceAccount manage SandboxClaims in the sandbox namespace
+# (the SDK creates them via the k8s API; only exec is proxied through the router).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "coding-agent.fullname" . }}-sandbox-manager
+  namespace: {{ .Values.agent.sandboxNamespace }}
+  labels:
+    {{- include "coding-agent.labels" . | nindent 4 }}
+rules:
+  - apiGroups: ["extensions.agents.x-k8s.io"]
+    resources: ["sandboxclaims"]
+    verbs: ["create", "get", "list", "watch", "update", "patch", "delete"]
+  - apiGroups: ["agents.x-k8s.io"]
+    resources: ["sandboxes"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "coding-agent.fullname" . }}-sandbox-manager
+  namespace: {{ .Values.agent.sandboxNamespace }}
+  labels:
+    {{- include "coding-agent.labels" . | nindent 4 }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "coding-agent.fullname" . }}
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: Role
+  name: {{ include "coding-agent.fullname" . }}-sandbox-manager
+  apiGroup: rbac.authorization.k8s.io
+{{- end }}

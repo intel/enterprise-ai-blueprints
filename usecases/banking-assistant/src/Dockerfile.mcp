@@ -1,0 +1,41 @@
+FROM python:3.12-slim
+# Explicit numeric UID/GID so Kubernetes can verify runAsNonRoot (a non-numeric
+# USER cannot be verified against runAsNonRoot: true).
+RUN groupadd -r -g 10001 mcpuser && useradd -r -u 10001 -g mcpuser -d /app mcpuser
+
+WORKDIR /app
+
+# Proxy build args (passed via --build-arg; needed for pip in proxied envs)
+ARG http_proxy
+ARG https_proxy
+ARG HTTP_PROXY
+ARG HTTPS_PROXY
+ARG no_proxy
+ARG NO_PROXY
+
+# Install deps first (layer cache)
+COPY requirements-mcp.txt .
+# apt-get upgrade patches base-image OS packages flagged by the image scan
+# (perl-base, gzip, libpcre2-8, libsqlite3, ...) to their fixed Debian versions.
+RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/* \
+    && pip install --no-cache-dir -r requirements-mcp.txt
+
+# Copy the MCP server package (server.py + data.py + __init__.py)
+COPY mcp_server/ ./mcp_server/
+
+RUN chown -R mcpuser:mcpuser /app
+
+ENV HOME=/app \
+    PYTHONUNBUFFERED=1 \
+    MCP_HOST=0.0.0.0 \
+    MCP_PORT=8000
+
+USER mcpuser
+
+EXPOSE 8000
+
+# TCP socket check — FastMCP exposes no /health endpoint
+HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
+    CMD python3 -c "import socket; s=socket.socket(); s.connect(('localhost', 8000)); s.close()"
+
+CMD ["python", "-m", "mcp_server.server"]
