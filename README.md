@@ -1,19 +1,20 @@
 # Agentic AI Blueprints
 
 A catalog of **deployable AI reference use cases** ("blueprints") that
-run on top of the **Agent Toolkit** — the Kubernetes-based infrastructure that
-provides the shared services every blueprint consumes: an OpenAI-compatible LLM
-gateway, vector/key-value stores, an isolated code-execution sandbox, distributed
-compute (KubeRay), and observability.
+run on top of **[Intel® AI for Enterprise Solutions](https://github.com/intel/enterprise-ai-solutions/tree/release-1.2)**
+("AI Solutions") with its **agent-toolkit layer** — the Kubernetes-based platform
+that provides the shared services every blueprint consumes: an OpenAI-compatible
+LLM gateway (LiteLLM), vector/key-value stores, an isolated code-execution
+sandbox, distributed compute (KubeRay), an Envoy Gateway, and observability.
 
 Each blueprint is **self-contained** — its own source, container images, Helm
-chart, and one-click deploy script — and plugs into the Agent Toolkit without
-modifying the infrastructure. Clone the repo, point a blueprint at your toolkit
-endpoints, and deploy.
+chart, and one-click deploy script — and plugs into AI Solutions without
+modifying the platform. Clone the repo, point a blueprint at your AI Solutions
+cluster (most endpoints are auto-discovered), and deploy.
 
 > **Important: these are demonstration samples, not products.** Every use case
 > in this repository is reference code intended to show how an agent can be built
-> on and deployed to the Agent Toolkit. The samples use synthetic data, carry
+> on and deployed to AI Solutions. The samples use synthetic data, carry
 > minimal authentication, and have not been hardened, load-tested, or validated
 > for production use. Do not deploy them to production environments or connect
 > them to real customer data or systems without your own security review,
@@ -21,7 +22,7 @@ endpoints, and deploy.
 > [SECURITY.md](SECURITY.md).
 
 > **New here?** Read [Prerequisites](#prerequisites) first — a blueprint cannot
-> run without the Agent Toolkit deployed.
+> run without AI Solutions (agent-toolkit layer) deployed.
 
 ---
 
@@ -32,6 +33,8 @@ endpoints, and deploy.
 - [Use Case Catalog](#use-case-catalog)
 - [Getting Started](#getting-started)
 - [Deploy a Use Case](#deploy-a-use-case)
+- [Migrating from the standalone Agent Toolkit](#migrating-from-the-standalone-agent-toolkit)
+- [Roadmap: native AI Solutions layer](#roadmap-native-ai-solutions-layer)
 - [Repository Structure](#repository-structure)
 - [Documentation](#documentation)
 - [Known limitations](#known-limitations)
@@ -44,59 +47,79 @@ endpoints, and deploy.
 ## How it works
 
 ```
-┌──────────────────────────────────────────────────────────────────┐
-│                     Agent Toolkit  (deploy first)                  │
-│                                                                    │
-│  GenAI Gateway (LiteLLM) │ Redis │ Agent Sandbox │ KubeRay         │
-│  LLM Models (vLLM) │ Keycloak │ Observability (Langfuse / OTEL)    │
-└──────────────────────────────────┬─────────────────────────────────┘
-                                   │  provides endpoints (LLM, memory,
-                                   │  sandbox, compute, telemetry)
-                    ┌──────────────▼──────────────┐
-                    │   Agentic AI Blueprints      │  ← this repo
-                    │                              │
-                    │   • coding-agent-maf         │
-                    │   • banking-assistant        │
-                    │   • (your use case here)     │
-                    └──────────────────────────────┘
+        https://<usecase>.<base_domain_name>
+                     │
+┌────────────────────▼─────────────────────────────────────────────────┐
+│  Envoy Gateway  eg-gateway  (envoy-gateway-system, TLS *.<base>)     │
+│                     │ HTTPRoutes (one per blueprint)                 │
+│                     │                                                │
+│  Intel® AI for Enterprise Solutions — agent-toolkit (deploy first)   │
+│  inference layer : LiteLLM │ LLM models (vLLM) │ Langfuse            │
+│  agent-toolkit   : Redis │ Agent Sandbox │ KubeRay (optional)        │
+│  platform        : Istio ambient (STRICT mTLS) │ Grafana / OTel      │
+└────────────────────┼─────────────────────────────────────────────────┘
+                     │  routes traffic in; blueprints call LiteLLM,
+                     │  Redis, sandbox router, Langfuse by URL + key
+      ┌──────────────▼───────────────┐
+      │   Agentic AI Blueprints      │  ← this repo
+      │   (ambient-mesh namespaces)  │
+      │   • coding-agent-maf         │
+      │   • banking-assistant        │
+      │   • (your use case here)     │
+      └──────────────────────────────┘
 ```
 
-The Agent Toolkit owns the platform (inference, auth, memory, sandboxing,
+AI Solutions owns the platform (inference, gateway, mesh, memory, sandboxing,
 compute, telemetry). Blueprints are thin applications that **consume** those
-services by URL + credentials. This separation means a blueprint never re-deploys
-infrastructure — it just connects to what the toolkit already runs.
+services by URL + credentials and publish themselves through an HTTPRoute on
+`eg-gateway`. This separation means a blueprint never re-deploys infrastructure —
+it just connects to what the platform already runs.
 
 ---
 
 ## Prerequisites
 
-### 1. Deploy the Agent Toolkit (required, first)
+### 1. Deploy AI Solutions with the agent-toolkit layer (required, first)
 
-Every blueprint depends on services the **Agent Toolkit** provides. Deploy it
-**before** any blueprint and follow its own documentation:
+Every blueprint depends on services **Intel® AI for Enterprise Solutions**
+provides. Deploy it **before** any blueprint:
 
-> **➡️ Agent Toolkit: [github.com/intel/enterprise-agent-toolkit](https://github.com/intel/enterprise-agent-toolkit)** — follow its README to deploy the infrastructure.
+> **➡️ [github.com/intel/enterprise-ai-solutions (release-1.2)](https://github.com/intel/enterprise-ai-solutions/tree/release-1.2)** —
+> agent-toolkit layer: [intel/enterprise-agent-toolkit release-2.0.0](https://github.com/intel/enterprise-agent-toolkit/tree/release-2.0.0);
+> inference layer: [intel/enterprise-inference release-1.1](https://github.com/intel/enterprise-inference/tree/release-1.1).
 
-The toolkit provides the endpoints blueprints consume:
+```bash
+git clone https://github.com/intel/enterprise-ai-solutions.git -b release-1.2 && cd enterprise-ai-solutions
+./es_auto_installer.sh configure
+./es_auto_installer.sh init agent-toolkit      # seeds env/local/*.yaml
+#   edit env/local/global_config.yaml (base_domain_name, proxy) and add the blueprint
+#   namespaces to litellm_allowed_namespaces in env/local/config.agent-toolkit.yaml
+./es_auto_installer.sh install agent-toolkit
+./es_auto_installer.sh validate agent-toolkit
+```
+
+The platform provides the endpoints blueprints consume:
 
 | Service | Consumed as | Used by |
 |---|---|---|
-| GenAI Gateway (LiteLLM) | `OPENAI_BASE_URL` + `OPENAI_API_KEY` | all blueprints |
-| Redis | `REDIS_URL` | conversational memory |
-| Agent Sandbox | `SANDBOX_ROUTER_URL` | code-execution blueprints |
-| KubeRay (optional) | `RAY_ADDRESS` | distributed parallel execution |
-| Observability (Langfuse) | `LANGFUSE_*` | tracing (optional) |
+| LiteLLM (inference layer) | `OPENAI_BASE_URL` + `OPENAI_API_KEY` | all blueprints |
+| Redis (`redis_stack_enabled`) | `REDIS_URL` | conversational memory |
+| Agent Sandbox (`agent_sandbox_enabled`) | `SANDBOX_ROUTER_URL` | code-execution blueprints |
+| KubeRay (`kuberay_enabled`, optional) | `RAY_ADDRESS` | distributed parallel execution |
+| Langfuse (inference layer) | `LANGFUSE_*` | tracing (optional) |
+| Envoy Gateway (`eg-gateway`) | `CLUSTER_URL` (= `base_domain_name`) | external access via HTTPRoute |
 
-See [docs/agentic-stack-setup.md](docs/agentic-stack-setup.md) for the setup
-checklist and [docs/endpoints-reference.md](docs/endpoints-reference.md) for the
-exact in-cluster service URLs.
+See [docs/ai-solutions-setup.md](docs/ai-solutions-setup.md) for the setup
+checklist (namespace allow-list, verification, `/etc/hosts` + CA) and
+[docs/endpoints-reference.md](docs/endpoints-reference.md) for the exact
+in-cluster service URLs.
 
 ### 2. Local tooling
 
 | Deployment mode | Requires |
 |---|---|
-| **Kubernetes** (cluster) | `kubectl`, `helm`, a kubeconfig with access to the Agent Toolkit cluster, and `nerdctl` (present on containerd clusters — the default) **or** `docker`. That's it: each `deploy.sh` builds the use case's image into the cluster's containerd `k8s.io` namespace (so the kubelet uses it with `pullPolicy: IfNotPresent`). On containerd, `nerdctl build` needs `buildkitd` — **the deploy installs and starts it for you** (see below); you don't set it up by hand. |
-| **Docker** (local dev) | Docker Engine 24+ with Docker Compose v2, and a reachable LLM endpoint |
+| **Kubernetes** (cluster) | `kubectl`, `helm`, a kubeconfig with access to the AI Solutions cluster (`env/local/kubeconfig.yaml`), and `nerdctl` (present on containerd clusters — the default) **or** `docker`. That's it: each `deploy.sh` builds the use case's image into the cluster's containerd `k8s.io` namespace (so the kubelet uses it with `pullPolicy: IfNotPresent`). On containerd, `nerdctl build` needs `buildkitd` — **the deploy installs and starts it for you** (see below); you don't set it up by hand. |
+| **Docker** (local dev) | Docker Engine 24+ with Docker Compose v2, and a reachable LLM endpoint (e.g. `https://litellm.<base_domain_name>/v1` + a LiteLLM key) |
 
 > **Building images (automatic).** Blueprints ship with local (`:latest`) image
 > references, so the k8s `deploy.sh` builds them on first deploy. Before building it
@@ -110,11 +133,11 @@ exact in-cluster service URLs.
 
 | Use Case | Category | Description | Ports | Docs |
 |---|---|---|---|---|
-| [coding-agent-maf](usecases/coding-agent-maf/) | Agent Toolkit | AI coding assistant (Microsoft Agent Framework) that writes, executes, and debugs Python in sandboxed Kubernetes pods, with persistent Redis memory | 8090 (DevUI) | [README](usecases/coding-agent-maf/README.md) |
-| [banking-assistant](usecases/banking-assistant/) | Agent Toolkit | Conversational banking assistant that answers account/loan queries and moves funds via a FastMCP banking-tools sidecar (MCP client/server demo) | 8090 (DevUI) | [README](usecases/banking-assistant/README.md) |
+| [coding-agent-maf](usecases/coding-agent-maf/) | AI Solutions · Agent Toolkit | AI coding assistant (Microsoft Agent Framework) that writes, executes, and debugs Python in sandboxed Kubernetes pods, with persistent Redis memory | 8090 (DevUI) | [README](usecases/coding-agent-maf/README.md) |
+| [banking-assistant](usecases/banking-assistant/) | AI Solutions · Agent Toolkit | Conversational banking assistant that answers account/loan queries and moves funds via a FastMCP banking-tools sidecar (MCP client/server demo) | 8090 (DevUI) | [README](usecases/banking-assistant/README.md) |
 
 > **Categories** group blueprints by the primary capability they demonstrate
-> (e.g. `Agent Toolkit`, `Inference`, `RAG`). Adding a use case? Pick or propose
+> (e.g. `AI Solutions · Agent Toolkit`, `AI Solutions · Inference`, `RAG`). Adding a use case? Pick or propose
 > a category — see [Contributing](#contributing).
 
 ---
@@ -126,15 +149,22 @@ exact in-cluster service URLs.
 git clone <THIS_REPO_URL>
 cd blueprints
 
-# 2. Configure (copy the template and fill in your Agent Toolkit endpoints)
+# 2. Configure (copy the template; in Kubernetes mode most values are auto-discovered)
 cp config.env config.local.env
-$EDITOR config.local.env          # set OPENAI_BASE_URL, OPENAI_API_KEY, MODEL_NAME, ...
+$EDITOR config.local.env          # set MODEL_NAME (e.g. qwen2-5-coder-14b); optionally
+                                  # CLUSTER_URL, OPENAI_API_KEY (LiteLLM virtual key), ...
 
 # 3. Load config into the environment
 set -a && source config.local.env && set +a
 ```
 
 `config.local.env` holds secrets — it is git-ignored; never commit it.
+
+`CLUSTER_URL` is the AI Solutions `base_domain_name` (e.g. `solutions.ai`);
+blueprints are published at `https://<usecase>.<CLUSTER_URL>`. To reach them from
+your workstation, map those hostnames to the `eg-gateway` IP in `/etc/hosts` and
+trust `env/local/logs/ai-solutions-ca.crt` (see
+[docs/ai-solutions-setup.md](docs/ai-solutions-setup.md#3-reach-the-gateway-hostnames--ca)).
 
 ---
 
@@ -146,7 +176,7 @@ Every blueprint supports two modes: **Kubernetes** (cluster) and **Docker**
 ### Kubernetes (recommended)
 
 ```bash
-# Dispatcher — auto-discovers GenAI Gateway + Redis in the cluster where possible
+# Dispatcher — auto-discovers LiteLLM, Redis, sandbox token, Langfuse keys and the base domain
 ./deploy-usecase.sh coding-agent-maf  --mode kubernetes
 ./deploy-usecase.sh banking-assistant --mode kubernetes
 
@@ -171,8 +201,46 @@ cd usecases/coding-agent-maf
 ```
 
 Configuration is read from the environment (see [config.env](config.env)); the
-scripts prompt for anything still unset. In Kubernetes mode the dispatcher
-auto-discovers cluster services so you rarely need to set URLs by hand.
+scripts prompt for anything still unset. In Kubernetes mode the deploy
+auto-discovers cluster services so you rarely need to set URLs by hand. It also
+labels the namespace for the Istio ambient mesh and Pod Security `restricted`,
+and warns if the namespace is not yet in `litellm_allowed_namespaces`.
+
+---
+
+## Migrating from the standalone Agent Toolkit
+
+Blueprints previously targeted the standalone Agent Toolkit (old `main` of
+`intel/enterprise-agent-toolkit`). With AI Solutions the endpoints moved:
+
+| What | Old (standalone toolkit) | New (AI Solutions release-1.2) |
+|---|---|---|
+| LLM gateway (in-cluster) | `genai-gateway-service.genai-gateway:4000` | `http://litellm.litellm.svc.cluster.local:4000/v1` |
+| LLM gateway (external) | `https://api.<domain>/v1` | `https://litellm.<base_domain_name>/v1` |
+| LLM key | `LITELLM_MASTER_KEY` env on the gateway deployment | Secret `litellm-master-key` (ns `litellm`), or a virtual key |
+| Langfuse | `genai-gateway-trace-web.genai-gateway:3000`, `trace-api.<domain>` | `http://langfuse-web.langfuse.svc.cluster.local:3000`, `langfuse.<base>` |
+| Langfuse keys | env on the gateway deployment | Secret `langfuse-secrets` (ns `langfuse`) |
+| Exposure | nginx Ingress + per-app TLS secret | HTTPRoute on Envoy Gateway `eg-gateway` (TLS at gateway) |
+| Feature flags | `deploy_genai_gateway`, `deploy_redis`, `deploy_agent_sandbox`, `deploy_kuberay`, `models=…` | LiteLLM always installed; `redis_stack_enabled`, `agent_sandbox_enabled`, `kuberay_enabled`, `llm_services_autodeploy_models` |
+| Node placement | `ei-inference-eligible=true` affinity | no affinity (`affinity: {}`) |
+| Redis, Agent Sandbox | — | unchanged |
+
+---
+
+## Roadmap: native AI Solutions layer
+
+The blueprints will soon be installable **directly through the AI Solutions
+installer as their own layer** — registered via
+`configs/repos/repos.blueprints.yaml` + `components.yaml` and Ansible roles, so
+that deployment becomes:
+
+```bash
+./es_auto_installer.sh init blueprints
+./es_auto_installer.sh install blueprints
+```
+
+Until then, install AI Solutions (agent-toolkit) first and deploy blueprints with
+`./deploy-usecase.sh` as described above.
 
 ---
 
@@ -188,11 +256,12 @@ auto-discovers cluster services so you rarely need to set URLs by hand.
 ├── deploy-usecase.sh          # One-click dispatcher (delegates to each use case)
 │
 ├── scripts/
+│   ├── ai-solutions-lib.sh     # Shared AI Solutions discovery + namespace helpers (sourced by deploy.sh)
 │   └── ensure-image-builder.sh # Installs/starts buildkitd + pre-stages base images (auto-run by deploy.sh)
 │
 ├── docs/
-│   ├── agentic-stack-setup.md   # Agent Toolkit setup checklist (deploy this first)
-│   ├── endpoints-reference.md   # In-cluster service URLs + credentials the toolkit exposes
+│   ├── ai-solutions-setup.md    # AI Solutions (agent-toolkit) setup checklist (deploy this first)
+│   ├── endpoints-reference.md   # In-cluster service URLs + credentials the platform exposes
 │   ├── observability-langfuse.md # Enable Langfuse tracing for a use case
 │   └── adding-new-usecases.md   # Step-by-step guide to author a new use case
 │
@@ -217,7 +286,7 @@ security scans auto-discover any directory that contains a `deploy.sh`.
 
 | Document | What it covers |
 |---|---|
-| [docs/agentic-stack-setup.md](docs/agentic-stack-setup.md) | Deploying the Agent Toolkit — the prerequisite for every blueprint |
+| [docs/ai-solutions-setup.md](docs/ai-solutions-setup.md) | Deploying Intel® AI for Enterprise Solutions (agent-toolkit layer) — the prerequisite for every blueprint |
 | [docs/endpoints-reference.md](docs/endpoints-reference.md) | The in-cluster service URLs (and credentials) blueprints connect to |
 | [docs/observability-langfuse.md](docs/observability-langfuse.md) | Enabling Langfuse tracing for a use case (projects, keys, OTEL) |
 | [docs/adding-new-usecases.md](docs/adding-new-usecases.md) | Authoring a new blueprint that matches repo standards |
@@ -244,8 +313,10 @@ use case README.
 - **Prompt injection is not mitigated.** As with any LLM agent, model output can
   trigger tool calls. Code execution is isolated in sandbox pods, but outputs
   should be treated as untrusted.
-- **TLS is optional.** Ingress TLS is enabled only when you supply a certificate
-  and key at deploy time.
+- **Self-signed TLS by default.** TLS is terminated at the platform's Envoy
+  Gateway with a self-signed wildcard certificate unless you configure your own.
+  The blueprint routes opt out of the gateway's LiteLLM-key check and rely on the
+  DevUI token alone.
 - **Ray parallel execution is optional and off by default** (`RAY_ENABLED=false`).
   When Ray is not connected, the parallel tool falls back to sequential execution
   inside the agent pod.
@@ -259,7 +330,7 @@ use case README.
 ## Contributing
 
 Contributions are welcome — new blueprints, fixes, and documentation. A blueprint
-can target the Agent Toolkit or any other purpose (inference, RAG, tooling demos).
+can target AI Solutions (agent-toolkit) or any other purpose (inference, RAG, tooling demos).
 
 Start with **[CONTRIBUTING.md](CONTRIBUTING.md)** and the authoring guide in
 **[docs/adding-new-usecases.md](docs/adding-new-usecases.md)**. In short: fork,

@@ -18,6 +18,15 @@ spec:
         {{- include "coding-agent.selectorLabels" . | nindent 8 }}
     spec:
       serviceAccountName: {{ if .Values.serviceAccount.create }}{{ include "coding-agent.fullname" . }}{{ else }}default{{ end }}
+      # Pod Security Standard 'restricted' (AI Solutions enforces PSS). UID/GID
+      # 10001 matches the numeric user baked into the image (Dockerfile).
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
       {{- with .Values.agent.affinity }}
       affinity:
         {{- toYaml . | nindent 8 }}
@@ -52,6 +61,11 @@ spec:
             failureThreshold: 3
           resources:
             {{- toYaml .Values.agent.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
       volumes:
         - name: workspace
           persistentVolumeClaim:

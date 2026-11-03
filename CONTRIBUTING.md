@@ -4,7 +4,8 @@ Thank you for your interest in contributing to **Agentic AI Blueprints**. This
 repository is a catalog of deployable AI use cases ("blueprints"). Contributions
 are welcome, including:
 
-- **New blueprints** — a use case can target the Agent Toolkit or any other
+- **New blueprints** — a use case can target Intel® AI for Enterprise Solutions
+  (agent-toolkit layer) or any other
   purpose (inference, RAG, tooling demos, integrations).
 - **Improvements** — bug fixes, hardening, performance, or docs for an existing
   blueprint.
@@ -43,8 +44,9 @@ enforces this.
    git checkout -b my-use-case main
    ```
 3. Make sure you can deploy at least one existing blueprint first — this confirms
-   your **Agent Toolkit** is reachable (see the repository
-   [Prerequisites](README.md#prerequisites)).
+   your **AI Solutions (agent-toolkit)** cluster is reachable (see the repository
+   [Prerequisites](README.md#prerequisites) and
+   [docs/ai-solutions-setup.md](docs/ai-solutions-setup.md)).
 
 ## Adding a new use case
 
@@ -63,18 +65,23 @@ usecases/<name>/
 ├── deploy.sh           # One-click deploy (Kubernetes)
 ├── docker-compose.yml  # Local development
 ├── examples/           # At least one runnable client (.py and/or .sh)
-├── helm-chart/         # Chart.yaml, values.yaml, templates/
+├── helm-chart/         # Chart.yaml, values.yaml, templates/ (HTTPRoute, not Ingress)
 └── src/                # Application source + Dockerfile
 ```
 
 When you add a use case, also:
 
 1. **Pick a category** for the [Use Case Catalog](README.md#use-case-catalog)
-   (e.g. `Agent Toolkit`, `Inference`, `RAG`). Reuse an existing category where
+   (e.g. `AI Solutions · Agent Toolkit`, `AI Solutions · Inference`, `RAG`). Reuse an existing category where
    it fits; propose a new one in your PR description if none does.
 2. **Add a row** to the catalog table in [README.md](README.md).
 3. **Read all configuration from environment variables** — no hardcoded secrets,
    endpoints, or credentials.
+4. **Follow the platform contract** — expose the app with an HTTPRoute on
+   `eg-gateway` (no Ingress, no per-app TLS secret), run under Pod Security
+   `restricted`, avoid hard `nodeAffinity`, and document that the namespace must
+   be added to `litellm_allowed_namespaces` in `config.agent-toolkit.yaml`. See
+   [docs/adding-new-usecases.md](docs/adding-new-usecases.md).
 
 ## Development standards
 
@@ -90,9 +97,10 @@ locally before opening a PR.
 - **Pin dependencies.** Use exact `==` versions in every `requirements*.txt`, not
   `>=`/ranges — this keeps builds reproducible and lets the dependency scanner
   resolve and check each package.
-- **Container hardening.** Dockerfiles run as a non-root user and drop unneeded
-  privileges; Helm and Compose set an explicit `securityContext` /
-  `cap_drop: [ALL]`. Static IaC scanners cannot render Helm templating, so set
+- **Container hardening.** Dockerfiles run as a non-root numeric user (UID/GID
+  `10001`) and drop unneeded privileges; Helm and Compose set an explicit
+  `securityContext` / `cap_drop: [ALL]` (charts must pass Pod Security
+  `restricted`: `runAsNonRoot`, drop `ALL` capabilities, seccomp `RuntimeDefault`). Static IaC scanners cannot render Helm templating, so set
   security fields as literal values, not via `{{ toYaml }}`.
 - **Security scans.** Fix Medium/High findings before review; document any
   accepted exception in [SECURITY.md](SECURITY.md) with a rationale, or suppress

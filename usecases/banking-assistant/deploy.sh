@@ -4,12 +4,12 @@
 # =============================================================================
 # deploy.sh — One-click deployer for the Banking Assistant use case
 #
-# Deploys the Banking Assistant (agent + banking MCP sidecar) into an existing
-# Agentic AI Stack cluster using Helm.
+# Deploys the Banking Assistant (agent + banking MCP sidecar) onto Intel® AI for
+# Enterprise Solutions (release-1.2, agent-toolkit layer) using Helm.
 #
 # Prerequisites:
-#   • Agentic AI Stack is running (see ../../docs/agentic-stack-setup.md)
-#   • kubectl is configured and pointing at your cluster
+#   • AI Solutions agent-toolkit is installed (see ../../docs/ai-solutions-setup.md)
+#   • kubectl is configured and pointing at your cluster (env/<env>/kubeconfig.yaml)
 #   • helm is installed
 #   • The banking-assistant and banking-mcp container images are built and
 #     pushed to a registry reachable by the cluster.
@@ -17,16 +17,16 @@
 # Usage:
 #   ./deploy.sh
 #
-# Environment variables (all optional — script prompts if not set):
-#   CLUSTER_URL         Base domain of the stack, e.g. api.example.com
-#   OPENAI_API_KEY      LiteLLM / GenAI Gateway API key
+# Environment variables (all optional — auto-discovered from the cluster or prompted):
+#   CLUSTER_URL         AI Solutions base_domain_name, e.g. solutions.ai (from eg-gateway)
+#   OPENAI_API_KEY      LiteLLM key (default: litellm-master-key; prefer a virtual key)
 #   MODEL_NAME          Model ID in LiteLLM (must support tool calling)
-#   OPENAI_BASE_URL     Override LiteLLM URL (default: in-cluster gateway)
-#   REDIS_URL           Override Redis URL (default: in-cluster redis)
+#   OPENAI_BASE_URL     Override LiteLLM URL (default: in-cluster litellm.litellm:4000)
+#   REDIS_URL           Override Redis URL (default: redis-stack-server-credentials)
+#   LANGFUSE_*          Langfuse keys/host (default: langfuse/langfuse-secrets)
 #   NAMESPACE           Kubernetes namespace (default: banking-assistant)
-#   INGRESS_HOST        Ingress hostname (default: banking-assistant.<CLUSTER_URL>)
-#   CERT_FILE           Path to TLS certificate PEM (optional)
-#   KEY_FILE            Path to TLS private key PEM (optional)
+#   INGRESS_HOST        HTTPRoute hostname (default: banking-assistant.<CLUSTER_URL>)
+#   PATCH_LITELLM_AUTHZ true = add NAMESPACE to LiteLLM's AuthorizationPolicy directly
 #   DEVUI_AUTH_TOKEN    Auth token for DevUI web interface (auto-generated if unset)
 #   SKIP_BUILD          Set to "true" to skip building images (use pre-built ones)
 #   CONTAINER_TOOL      Override image builder: "nerdctl" or "docker" (auto-detected)
@@ -50,6 +50,9 @@ info()    { echo -e "${CYAN}[INFO]${NC}  $*"; }
 success() { echo -e "${GREEN}[OK]${NC}    $*"; }
 warn()    { echo -e "${YELLOW}[WARN]${NC}  $*"; }
 die()     { echo -e "${RED}[ERROR]${NC} $*" >&2; exit 1; }
+
+# shellcheck source=scripts/ai-solutions-lib.sh
+source "${SCRIPT_DIR}/../../scripts/ai-solutions-lib.sh"
 
 # ---------------------------------------------------------------------------
 # Dependency check
@@ -149,21 +152,26 @@ echo "  Banking Assistant — Deployment"
 echo "============================================================"
 echo ""
 
+aisol_discover_base_domain
+aisol_discover_litellm_key
+aisol_discover_langfuse
+
 prompt_if_empty CLUSTER_URL \
-  "Agentic Stack base domain (e.g. api.example.com)"
+  "AI Solutions base_domain_name (e.g. solutions.ai)"
+[[ -n "${CLUSTER_URL}" ]] || die "CLUSTER_URL (AI Solutions base_domain_name) is required."
 
 prompt_secret_if_empty OPENAI_API_KEY \
-  "LiteLLM / GenAI Gateway API key (OPENAI_API_KEY)"
+  "LiteLLM API key (OPENAI_API_KEY)"
 
 prompt_if_empty MODEL_NAME \
   "Model name registered in the gateway (must support tool calling)"
 
 NAMESPACE="${NAMESPACE:-banking-assistant}"
 INGRESS_HOST="${INGRESS_HOST:-banking-assistant.${CLUSTER_URL}}"
-OPENAI_BASE_URL="${OPENAI_BASE_URL:-http://genai-gateway-service.genai-gateway.svc.cluster.local:4000/v1}"
+OPENAI_BASE_URL="${OPENAI_BASE_URL:-${AISOL_LITELLM_URL}}"
 DEVUI_AUTH_TOKEN="${DEVUI_AUTH_TOKEN:-$(openssl rand -hex 24 2>/dev/null || echo "changeme")}"
 
-# Authenticated Redis URL from the toolkit's credentials secret (the shared Redis
+# Authenticated Redis URL from the agent-toolkit's credentials secret (the shared Redis
 # needs a password). Falls back to a passwordless URL if the secret isn't found.
 if [[ -z "${REDIS_URL:-}" ]]; then
   REDIS_URL="$(kubectl get secret -n redis redis-stack-server-credentials \
@@ -183,6 +191,7 @@ echo "  INGRESS_HOST       = ${INGRESS_HOST}"
 echo "  OPENAI_BASE_URL    = ${OPENAI_BASE_URL}"
 echo "  MODEL_NAME         = ${MODEL_NAME}"
 echo "  REDIS_URL          = $(sed -E 's#(://[^:]*:)[^@]*(@)#\1****\2#' <<<"${REDIS_URL}")"
+echo "  LANGFUSE_HOST      = ${LANGFUSE_HOST:-(tracing disabled)}"
 echo ""
 
 # ---------------------------------------------------------------------------
@@ -191,55 +200,11 @@ echo ""
 build_images
 
 # ---------------------------------------------------------------------------
-# Namespace
+# Namespace (PSS restricted + Istio ambient) and LiteLLM access
 # ---------------------------------------------------------------------------
-info "Ensuring namespace '${NAMESPACE}' exists..."
-kubectl create namespace "${NAMESPACE}" --dry-run=client -o yaml | kubectl apply -f - >/dev/null
-
-# ---------------------------------------------------------------------------
-# TLS secret
-# ---------------------------------------------------------------------------
-if [[ -z "${TLS_SECRET_NAME:-}" ]]; then
-  if [[ -n "${CERT_FILE:-}" && -n "${KEY_FILE:-}" ]]; then
-    CERT_FILE="${CERT_FILE/#\~/$HOME}"
-    KEY_FILE="${KEY_FILE/#\~/$HOME}"
-    TLS_SECRET_NAME="banking-assistant-tls"
-    if kubectl get secret "${TLS_SECRET_NAME}" -n "${NAMESPACE}" &>/dev/null; then
-      info "TLS secret '${TLS_SECRET_NAME}' already exists — skipping."
-    else
-      [[ -f "${CERT_FILE}" ]] || die "CERT_FILE '${CERT_FILE}' not found."
-      [[ -f "${KEY_FILE}" ]]  || die "KEY_FILE '${KEY_FILE}' not found."
-      kubectl create secret tls "${TLS_SECRET_NAME}" \
-        --cert="${CERT_FILE}" --key="${KEY_FILE}" -n "${NAMESPACE}"
-      success "Created TLS secret '${TLS_SECRET_NAME}'."
-    fi
-  else
-    read -rp "  Path to TLS certificate PEM (leave blank to skip TLS): " CERT_FILE
-    if [[ -n "${CERT_FILE}" ]]; then
-      read -rp "  Path to TLS private key PEM: " KEY_FILE
-    fi
-    CERT_FILE="${CERT_FILE:-}"; CERT_FILE="${CERT_FILE/#\~/$HOME}"
-    KEY_FILE="${KEY_FILE:-}"; KEY_FILE="${KEY_FILE/#\~/$HOME}"
-    if [[ -n "${CERT_FILE}" && -n "${KEY_FILE:-}" ]]; then
-      TLS_SECRET_NAME="banking-assistant-tls"
-      [[ -f "${CERT_FILE}" ]] || die "CERT_FILE '${CERT_FILE}' not found."
-      [[ -f "${KEY_FILE}" ]]  || die "KEY_FILE '${KEY_FILE}' not found."
-      kubectl create secret tls "${TLS_SECRET_NAME}" \
-        --cert="${CERT_FILE}" --key="${KEY_FILE}" -n "${NAMESPACE}"
-      success "Created TLS secret '${TLS_SECRET_NAME}'."
-    else
-      info "No TLS cert provided. Ingress will be created without TLS."
-      TLS_SECRET_NAME=""
-    fi
-  fi
-else
-  if ! kubectl get secret "${TLS_SECRET_NAME}" -n "${NAMESPACE}" &>/dev/null; then
-    warn "TLS_SECRET_NAME '${TLS_SECRET_NAME}' not found in namespace '${NAMESPACE}'. TLS will be disabled."
-    TLS_SECRET_NAME=""
-  else
-    info "Using existing TLS secret '${TLS_SECRET_NAME}'."
-  fi
-fi
+# TLS is terminated at the AI Solutions gateway — no per-app certificate needed.
+aisol_prepare_namespace "${NAMESPACE}"
+aisol_check_litellm_access "${NAMESPACE}"
 
 # ---------------------------------------------------------------------------
 # Helm deploy
@@ -263,18 +228,11 @@ HELM_ARGS=(
   --set "agent.modelName=${MODEL_NAME}"
   --set "agent.devuiAuthToken=${DEVUI_AUTH_TOKEN}"
   --set "redisUrl=${REDIS_URL}"
-  --set "ingress.enabled=true"
-  --set "ingress.host=${INGRESS_HOST}"
+  --set "httpRoute.enabled=true"
+  --set "httpRoute.host=${INGRESS_HOST}"
   --wait
   --timeout 5m
 )
-
-if [[ -n "${TLS_SECRET_NAME}" ]]; then
-  HELM_ARGS+=(
-    --set "ingress.tls.enabled=true"
-    --set "ingress.tls.secretName=${TLS_SECRET_NAME}"
-  )
-fi
 
 # Langfuse tracing (optional) — passed only when keys are provided.
 if [[ -n "${LANGFUSE_PUBLIC_KEY:-}" && -n "${LANGFUSE_SECRET_KEY:-}" ]]; then
@@ -297,6 +255,7 @@ success "Banking Assistant deployed — namespace: ${NAMESPACE}"
 echo ""
 info "Access the Banking Assistant:"
 info "  https://${INGRESS_HOST}"
+aisol_print_gateway_hint "${INGRESS_HOST}"
 info "  (or locally: kubectl port-forward -n ${NAMESPACE} svc/banking-assistant 8090:8090 → http://localhost:8090)"
 info ""
 info "  DevUI login token (enter in the browser login prompt):"

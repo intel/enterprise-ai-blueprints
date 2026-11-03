@@ -23,14 +23,14 @@ agent:
   # LLM configuration – openaiApiKey is required
   openaiApiKey: ""            # REQUIRED – set via --set or a separate secret values file
   devuiAuthToken: ""          # REQUIRED – auth token for DevUI when bound to non-loopback host
-  openaiBaseUrl: "http://genai-gateway-service.genai-gateway.svc.cluster.local:4000/v1"
+  openaiBaseUrl: "http://litellm.litellm.svc.cluster.local:4000/v1"   # AI Solutions LiteLLM (inference layer)
   # Langfuse observability (optional)
   langfusePublicKey: ""
   langfuseSecretKey: ""
-  langfuseHost: ""              # -> LANGFUSE_HOST (the SDK's env var)
+  langfuseHost: ""              # -> LANGFUSE_HOST, e.g. http://langfuse-web.langfuse.svc.cluster.local:3000
   langfuseEnableSensitiveData: "true"
   # modelName must be a model ID registered in LiteLLM and must support tool/function
-  # calling for the MCP tools to be invoked, e.g. Qwen/Qwen3-Coder-30B-A3B-Instruct.
+  # calling for the MCP tools to be invoked, e.g. qwen2-5-coder-14b.
   modelName: ""   # REQUIRED – set at deploy time
 
   # URL of the banking MCP server. In the sidecar topology this is loopback.
@@ -55,16 +55,19 @@ agent:
       cpu: "1"
       memory: 1Gi
 
-  # Node affinity — schedule on inference-eligible worker nodes.
-  # Set to {} to disable and allow scheduling on any node.
-  affinity:
-    nodeAffinity:
-      requiredDuringSchedulingIgnoredDuringExecution:
-        nodeSelectorTerms:
-          - matchExpressions:
-              - key: ei-inference-eligible
-                operator: In
-                values: ["true"]
+  # Node affinity. AI Solutions no longer sets the old ei-inference-eligible label;
+  # multi-node clusters label nodes workload-class=platform|inference instead.
+  # Empty = schedule anywhere. Example soft preference:
+  #   affinity:
+  #     nodeAffinity:
+  #       preferredDuringSchedulingIgnoredDuringExecution:
+  #         - weight: 50
+  #           preference:
+  #             matchExpressions:
+  #               - key: workload-class
+  #                 operator: In
+  #                 values: ["platform"]
+  affinity: {}
 
 # ---------------------------------------------------------------------------
 # Banking MCP server (container 2 — sidecar in the same pod)
@@ -91,25 +94,30 @@ mcp:
   # directly in templates/deployment.yaml (so static IaC scanners can verify it).
 
 # ---------------------------------------------------------------------------
-# External Redis URL
-# Provide this to point at the shared Redis deployed in the 'redis' namespace.
+# Redis URL — shared Redis from the agent-toolkit layer (namespace 'redis').
+# It requires auth: deploy.sh reads the full URL from the
+# redis-stack-server-credentials secret (key REDIS_URL).
 # ---------------------------------------------------------------------------
 redisUrl: "redis://redis-stack-server.redis.svc.cluster.local:6379"
 
 # ---------------------------------------------------------------------------
-# Ingress
-# Enable to expose the Banking Assistant via the ingress controller.
+# HTTPRoute (Envoy Gateway / Gateway API)
+# AI Solutions exposes services through the shared Envoy Gateway 'eg-gateway'
+# (namespace envoy-gateway-system); TLS is terminated there with the wildcard
+# *.<base_domain_name> certificate, so the chart needs no TLS secret.
 # ---------------------------------------------------------------------------
-ingress:
+httpRoute:
   enabled: false
-  className: nginx
-  host: ""            # e.g. banking-assistant.api.example.com
+  host: ""            # e.g. banking-assistant.solutions.ai  (<name>.<base_domain_name>)
   path: /
-  pathType: Prefix
-  tls:
-    enabled: false
-    secretName: ""    # TLS secret in the banking-assistant namespace
-  annotations: {}
+  gateway:
+    name: eg-gateway
+    namespace: envoy-gateway-system
+    sectionName: https
+  # The gateway-wide SecurityPolicy validates a LiteLLM key on every request.
+  # DevUI has its own bearer token (DEVUI_AUTH_TOKEN), so by default the chart
+  # ships an empty route-level SecurityPolicy that opts this route out.
+  bypassGatewayAuth: true
 
 # ---------------------------------------------------------------------------
 # Chart-wide overrides

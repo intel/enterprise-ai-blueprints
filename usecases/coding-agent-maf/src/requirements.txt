@@ -29,7 +29,7 @@ python-dotenv==1.2.3
 # Pinned to 2.56.0 to patch CVE-2023-6019 and the 2025/2026 Ray advisories;
 # this also refreshes the bundled jackson-databind / org.apache jars flagged by
 # the image scan. When RAY_ENABLED=true the KubeRay cluster image must match this
-# client version: set rayImage in agentic-config.cfg to
+# client version: set kuberay_ray_image in config.agent-toolkit.yaml to
 # rayproject/ray:2.56.0-py312 (was rayproject/ray:2.40.0-py312).
 ray[default]>=2.56.0
 # aiohttp is pulled in transitively by ray[default]; pin the patched release

@@ -18,6 +18,15 @@ spec:
         {{- include "banking-assistant.selectorLabels" . | nindent 8 }}
     spec:
       serviceAccountName: {{ if .Values.serviceAccount.create }}{{ include "banking-assistant.fullname" . }}{{ else }}default{{ end }}
+      # Pod Security Standard 'restricted' (AI Solutions enforces PSS). UID/GID
+      # 10001 matches the numeric user baked into the image (Dockerfile).
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
       {{- with .Values.agent.affinity }}
       affinity:
         {{- toYaml . | nindent 8 }}
@@ -50,6 +59,11 @@ spec:
             failureThreshold: 3
           resources:
             {{- toYaml .Values.agent.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
         # --- Container 2: the banking MCP server sidecar (Streamable HTTP 8000)
         - name: banking-mcp
           image: "{{ .Values.mcp.image.repository }}:{{ .Values.mcp.image.tag }}"

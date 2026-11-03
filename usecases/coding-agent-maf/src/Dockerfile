@@ -1,5 +1,6 @@
 FROM python:3.12-slim
-RUN groupadd -r agentuser && useradd -r -g agentuser -d /app agentuser
+# Numeric UID/GID 10001 so runAsNonRoot can be verified (PSS restricted).
+RUN groupadd -r -g 10001 agentuser && useradd -r -u 10001 -g agentuser -d /app agentuser
 
 WORKDIR /app
 
