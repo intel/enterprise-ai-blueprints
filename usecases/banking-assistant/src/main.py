@@ -5,7 +5,7 @@
 Launch the Banking Assistant with DevUI.
 
 Starts a web interface for interacting with the banking agent. The agent routes
-natural-language banking requests to a GenAI-gateway model and uses a remote MCP
+natural-language banking requests to a LiteLLM-served model and uses a remote MCP
 server (the banking sidecar) for all account data and operations.
 """
 

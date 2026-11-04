@@ -166,8 +166,7 @@ SKIP_BUILD=true AGENT_IMAGE=myregistry/banking-assistant:1.0 \
 ```
 
 > **TLS is handled by the gateway.** `eg-gateway` terminates TLS for
-> `*.<base_domain_name>` with its wildcard secret `gateway-tls`; the old
-> `CERT_FILE`/`KEY_FILE`/`TLS_SECRET_NAME` options are gone. The chart's HTTPRoute
+> `*.<base_domain_name>` with its wildcard secret `gateway-tls`. The chart's HTTPRoute
 > ships an empty route-level SecurityPolicy (`httpRoute.bypassGatewayAuth: true`)
 > so the gateway does not demand a LiteLLM key — the DevUI token protects the app.
 

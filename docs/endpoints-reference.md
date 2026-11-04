@@ -32,7 +32,7 @@ Reserved platform hostnames (do not reuse for a blueprint): `inference.<base>`,
 
 ### External hostnames (HTTPRoutes)
 
-There is no nginx Ingress. Everything external is an **HTTPRoute** attached to
+Everything external is an **HTTPRoute** attached to
 the Envoy Gateway `eg-gateway` (namespace `envoy-gateway-system`, listener
 `https` for `*.<base>`, TLS terminated at the gateway with the wildcard secret
 `gateway-tls`):

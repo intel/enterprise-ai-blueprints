@@ -69,8 +69,8 @@ agent:
       cpu: "1"
       memory: 1Gi
 
-  # Node affinity. AI Solutions no longer sets the old ei-inference-eligible label;
-  # multi-node clusters label nodes workload-class=platform|inference instead.
+  # Node affinity. AI Solutions multi-node clusters label nodes
+  # workload-class=platform|inference.
   # Empty = schedule anywhere. Example soft preference:
   #   affinity:
   #     nodeAffinity:

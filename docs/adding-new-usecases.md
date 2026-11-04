@@ -159,12 +159,12 @@ httpRoute:
     sectionName: https
   bypassGatewayAuth: true   # app has its own auth (e.g. DEVUI_AUTH_TOKEN)
 
-affinity: {}            # no hard nodeAffinity — the old ei-inference-eligible label is gone
+affinity: {}            # no hard nodeAffinity — schedule anywhere
 ```
 
 ### Exposure: HTTPRoute + SecurityPolicy
 
-AI Solutions has **no nginx Ingress** and no per-app TLS secrets: TLS is
+Blueprints need no per-app TLS secrets: TLS is
 terminated at the Envoy Gateway `eg-gateway` (wildcard secret `gateway-tls`).
 Ship an HTTPRoute attached to its `https` listener:
 

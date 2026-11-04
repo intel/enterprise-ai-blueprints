@@ -11,7 +11,6 @@ in its `agent-toolkit` layer ([enterprise-agent-toolkit release-2.0.0](https://g
 which pulls in the inference layer (enterprise-inference release-1.1).
 
 The blueprints only *consume* the platform. They never install or modify platform components.
-Earlier versions targeted the standalone Agent Toolkit (old `main`); that platform is no longer supported here.
 
 **Roadmap:** blueprints will be packaged as a native AI Solutions layer
 (`configs/repos/repos.blueprints.yaml` in ai-solutions, plus `components.yaml`, `config.yaml` and
@@ -49,7 +48,7 @@ and `banking-assistant` (FastMCP sidecar, Redis memory).
 | Gateway | Gateway `eg-gateway`, ns `envoy-gateway-system`, listener `https` = `*.<base_domain_name>` | wildcard TLS terminated at the gateway |
 
 Rules every blueprint must follow:
-- **Exposure:** use an `HTTPRoute` (`parentRefs` → `eg-gateway`/`envoy-gateway-system`/`https`, host `<usecase>.<base>`). There is **no nginx Ingress** and no per-app TLS secret.
+- **Exposure:** use an `HTTPRoute` (`parentRefs` → `eg-gateway`/`envoy-gateway-system`/`https`, host `<usecase>.<base>`). TLS is terminated at the gateway, so there is no per-app TLS secret.
   - The gateway-wide `SecurityPolicy gateway-auth` requires a LiteLLM key on every route. Charts ship an empty route-level SecurityPolicy (`httpRoute.bypassGatewayAuth: true`) because DevUI has its own `DEVUI_AUTH_TOKEN`.
   - Don't use the reserved hosts `inference.`, `keycloak.` or `grafana.`.
 - **Mesh:** Istio ambient with STRICT mTLS.
@@ -58,7 +57,7 @@ Rules every blueprint must follow:
 - **Pod Security:** namespaces are labelled `restricted`.
   - Pods: `runAsNonRoot`, UID/GID 10001 (numeric `USER` in the Dockerfile), `fsGroup`, `seccompProfile: RuntimeDefault`.
   - Containers: `allowPrivilegeEscalation: false`, `capabilities.drop: [ALL]`.
-- **Scheduling:** no hard node affinity. The old `ei-inference-eligible` label no longer exists; AI Solutions uses `workload-class=platform|inference`, on multi-node clusters only.
+- **Scheduling:** no hard node affinity. AI Solutions labels nodes `workload-class=platform|inference`, on multi-node clusters only.
 - **Sandboxes:** sandbox pods have no in-cluster egress (NetworkPolicy `eat-sandbox-pool-egress`). Code running in a sandbox cannot call LiteLLM or Redis.
 - **Auth mode:** the agent-toolkit default is `auth_provider: litellm`, so Keycloak is not deployed. Don't add Keycloak dependencies.
 

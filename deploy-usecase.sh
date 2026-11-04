@@ -144,12 +144,12 @@ auto_discover_services() {
 
   if [[ -z "${OPENAI_BASE_URL:-}" ]]; then
     # AI Solutions installs LiteLLM as Service 'litellm' in namespace 'litellm'
-    # (port 4000). Fall back to any litellm/genai-gateway Service on port 4000 —
+    # (port 4000). Fall back to any litellm Service on port 4000 —
     # matching by name alone would pick a co-located cache/DB (e.g. litellm-redis).
     local match=""
     kubectl get svc litellm -n litellm &>/dev/null && match="litellm litellm 4000"
     [[ -n "$match" ]] || match=$(kubectl get svc -A -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.metadata.namespace}{" "}{range .spec.ports[*]}{.port}{" "}{end}{"|"}{"\n"}{end}' 2>/dev/null \
-      | grep -iE 'litellm|genai-gateway' | grep -E ' 4000( |\|)' | head -1) || true
+      | grep -i 'litellm' | grep -E ' 4000( |\|)' | head -1) || true
     if [[ -n "$match" ]]; then
       OPENAI_BASE_URL="http://$(awk '{printf "%s.%s.svc.cluster.local", $1, $2}' <<<"$match"):4000/v1"
       success "Auto-discovered LLM: $OPENAI_BASE_URL"
