@@ -1,0 +1,90 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "deep-research-agent.fullname" . }}
+  labels:
+    {{- include "deep-research-agent.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.agent.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "deep-research-agent.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "deep-research-agent.selectorLabels" . | nindent 8 }}
+      annotations:
+        # Roll pods automatically when the config/secret content changes.
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+    spec:
+      serviceAccountName: {{ include "deep-research-agent.serviceAccountName" . }}
+      # Pod Security Standard 'restricted' (AI Solutions enforces PSS). UID/GID
+      # 10001 matches the numeric user baked into the image (Dockerfile); fsGroup
+      # makes the data PVC writable for the SQLite DB.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      {{- with .Values.agent.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.agent.image.repository }}:{{ .Values.agent.image.tag }}"
+          imagePullPolicy: {{ .Values.agent.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.agent.port }}
+              protocol: TCP
+            {{- if .Values.agent.evalDashboard.enabled }}
+            - name: dashboard
+              containerPort: {{ .Values.agent.evalDashboard.port }}
+              protocol: TCP
+            {{- end }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "deep-research-agent.fullname" . }}-config
+            - secretRef:
+                name: {{ include "deep-research-agent.fullname" . }}-secret
+          # /health is public (not behind API_KEYS) and reports the LLM endpoint
+          # and Tavily reachability. Startup is slow — the extractive summarizer
+          # loads a sentence-transformers model into memory before serving.
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 45
+            periodSeconds: 30
+            timeoutSeconds: 15
+            failureThreshold: 6
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 45
+            periodSeconds: 15
+            timeoutSeconds: 15
+            failureThreshold: 6
+          volumeMounts:
+            - name: data
+              mountPath: {{ .Values.agent.storage.mountPath }}
+          resources:
+            {{- toYaml .Values.agent.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+      volumes:
+        - name: data
+          {{- if .Values.agent.storage.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "deep-research-agent.fullname" . }}-data
+          {{- else }}
+          emptyDir: {}
+          {{- end }}

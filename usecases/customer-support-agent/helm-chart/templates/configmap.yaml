@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "customer-support-agent.fullname" . }}-config
+  labels:
+    {{- include "customer-support-agent.labels" . | nindent 4 }}
+data:
+  LLM_BASE_URL: {{ .Values.agent.llmBaseUrl | quote }}
+  LLM_MODEL: {{ .Values.agent.llmModel | quote }}
+  API_PORT: {{ .Values.agent.apiPort | quote }}
+  STREAMLIT_PORT: {{ .Values.agent.streamlitPort | quote }}
+  # Long-term memory (RediSearch + gateway embeddings)
+  MEMORY_ENABLED: {{ .Values.agent.memory.enabled | quote }}
+  REDIS_URL: {{ .Values.agent.memory.redisUrl | quote }}
+  MEMORY_INDEX: {{ .Values.agent.memory.index | quote }}
+  MEMORY_TOP_K: {{ .Values.agent.memory.topK | quote }}
+  EMBEDDING_MODEL: {{ .Values.agent.memory.embeddingModel | quote }}
+  EMBEDDING_DIMS: {{ .Values.agent.memory.embeddingDims | quote }}
+  # Parallel tool execution (local ThreadPool or KubeRay)
+  TOOL_EXECUTOR: {{ .Values.agent.parallel.executor | quote }}
+  TOOL_MAX_PARALLEL: {{ .Values.agent.parallel.maxParallel | quote }}
+  RAY_ADDRESS: {{ .Values.agent.parallel.rayAddress | quote }}
+  SELF_API_URL: {{ .Values.agent.parallel.selfApiUrl | default (printf "http://%s.%s.svc.cluster.local:%v" (include "customer-support-agent.fullname" .) .Release.Namespace .Values.agent.apiPort) | quote }}
+  DB_PATH: {{ printf "%s/techgadgets.db" .Values.agent.dataDir | quote }}

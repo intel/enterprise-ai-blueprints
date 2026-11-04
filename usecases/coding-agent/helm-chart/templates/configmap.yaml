@@ -1,0 +1,39 @@
+{{- include "coding-agent.validateRedis" . }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "coding-agent.fullname" . }}-config
+  labels:
+    {{- include "coding-agent.labels" . | nindent 4 }}
+data:
+  OPENAI_BASE_URL: {{ .Values.agent.openaiBaseUrl | quote }}
+  MODEL_NAME: {{ .Values.agent.modelName | quote }}
+  OPENAI_MODEL: {{ .Values.agent.modelName | quote }}
+  OPENAI_CHAT_COMPLETION_MODEL: {{ .Values.agent.modelName | quote }}
+  {{- if .Values.redisUrl }}
+  REDIS_URL: {{ .Values.redisUrl | quote }}
+  {{- else }}
+  REDIS_URL: "redis://redis-stack-server:6379"
+  {{- end }}
+  WORKSPACE_DIR: {{ .Values.agent.workspaceDir | quote }}
+  AUTO_OPEN_BROWSER: "false"
+  PYTHONUNBUFFERED: "1"
+  no_proxy: {{ .Values.agent.noProxy | quote }}
+  NO_PROXY: {{ .Values.agent.noProxy | quote }}
+  # Agent Sandbox
+  SANDBOX_NAMESPACE: {{ .Values.agent.sandboxNamespace | quote }}
+  SANDBOX_TEMPLATE: {{ .Values.agent.sandboxTemplate | quote }}
+  SANDBOX_WARMPOOL: {{ .Values.agent.sandboxWarmPool | quote }}
+  SANDBOX_ROUTER_URL: {{ .Values.agent.sandboxRouterUrl | quote }}
+  # Ray (optional)
+  {{- if .Values.agent.ray.enabled }}
+  RAY_ENABLED: "true"
+  RAY_ADDRESS: {{ .Values.agent.ray.address | quote }}
+  {{- else }}
+  RAY_ENABLED: "false"
+  {{- end }}
+  # Langfuse (optional; keys live in the Secret)
+  {{- if .Values.agent.langfuse.host }}
+  LANGFUSE_HOST: {{ .Values.agent.langfuse.host | quote }}
+  {{- end }}
+  LANGFUSE_ENABLE_SENSITIVE_DATA: {{ .Values.agent.langfuse.enableSensitiveData | quote }}

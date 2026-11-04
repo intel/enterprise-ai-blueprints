@@ -22,6 +22,9 @@ the same value the deploy scripts call `CLUSTER_URL`.
 | **OTel Collector** | `opentelemetry-collector.monitoring.svc.cluster.local:4317` (gRPC) / `:4318` (HTTP) | *(in-cluster only)* |
 | **Coding Agent** | `http://coding-agent.coding-agent-maf.svc.cluster.local:8090` | `https://coding-agent.<base>` |
 | **Banking Assistant** | `http://banking-assistant.banking-assistant.svc.cluster.local:8090` | `https://banking-assistant.<base>` |
+| **Coding Agent (LangGraph)** | `http://coding-agent-langgraph.coding-agent.svc.cluster.local:8090` | `https://coding-agent-langgraph.<base>` |
+| **Customer Support Agent** | `http://customer-support-agent.customer-support-agent.svc.cluster.local:8501` (UI) / `:8502` (API) | `https://customer-support-agent.<base>` (`/api`, `/v1` → API; `/` → UI) |
+| **Deep Research Agent** | `http://deep-research-agent.deep-research-agent.svc.cluster.local:8081` (dashboard `:8082`) | `https://deep-research-agent.<base>` (optional `https://deep-research-agent-dashboard.<base>`) |
 
 Reserved platform hostnames (do not reuse for a blueprint): `inference.<base>`,
 `keycloak.<base>`, `grafana.<base>`.
@@ -71,7 +74,8 @@ installer to `env/local/logs/ai-solutions-ca.crt`. Use
 > `gateway-auth` (extAuth → LiteLLM `/key/verify`), so every route requires a
 > LiteLLM key **unless** the app ships its own (empty) route-level
 > SecurityPolicy. The blueprint charts do (`httpRoute.bypassGatewayAuth: true`)
-> because DevUI enforces its own `DEVUI_AUTH_TOKEN`.
+> so browsers can open them; each app then relies on its own auth
+> (`DEVUI_AUTH_TOKEN`, deep-research `API_KEYS`; customer-support has none).
 
 ### All cluster services
 
@@ -379,6 +383,25 @@ http://coding-agent.coding-agent-maf.svc.cluster.local:8090
 
 ---
 
+## Blueprints
+
+Endpoints of the other blueprints in this repo. See each use case's README for
+the full API.
+
+| Blueprint | Namespace / Service | External host | Auth | Key endpoints |
+|---|---|---|---|---|
+| Coding Agent (LangGraph) | `coding-agent` / `coding-agent-langgraph:8090` | `coding-agent-langgraph.<base>` | `Authorization: Bearer <DEVUI_AUTH_TOKEN>` on `/v1/*` | `GET /health`, `GET /v1/entities`, `POST /v1/chat/completions`, `POST /v1/responses` |
+| Customer Support Agent | `customer-support-agent` / `customer-support-agent:8501,8502` | `customer-support-agent.<base>` | **none** (demo data only) | `GET /api/v1/health`, `POST /api/v1/chat`, `GET /api/v1/tools`, `POST /v1/chat/completions`; Streamlit UI at `/` |
+| Deep Research Agent | `deep-research-agent` / `deep-research-agent:8081` (`:8082` dashboard) | `deep-research-agent.<base>`, `deep-research-agent-dashboard.<base>` | optional `X-API-Key` on `/api/*` (`API_KEYS`) | `GET /health`, `POST /api/research`, `GET /api/research/{id}/stream` (SSE), `GET /api/research/{id}` |
+
+All three routes ship the empty route-level SecurityPolicy
+(`httpRoute.bypassGatewayAuth: true`), and their namespaces must be listed in
+`litellm_allowed_namespaces`. `customer-support-agent` additionally uses Redis
+and the `bge-base-en` embedding model (add it to `llm_services_autodeploy_models`);
+`deep-research-agent` needs `TAVILY_API_KEY` and internet egress.
+
+---
+
 ## Port-Forward Cheatsheet
 
 Useful when testing locally against a remote cluster:
@@ -398,6 +421,15 @@ kubectl port-forward -n coding-agent-maf svc/coding-agent 8090:8090 &
 
 # Banking Assistant
 kubectl port-forward -n banking-assistant svc/banking-assistant 8091:8090 &
+
+# Coding Agent (LangGraph)
+kubectl port-forward -n coding-agent svc/coding-agent-langgraph 8092:8090 &
+
+# Customer Support Agent (Streamlit UI, FastAPI)
+kubectl port-forward -n customer-support-agent svc/customer-support-agent 8501:8501 8502:8502 &
+
+# Deep Research Agent
+kubectl port-forward -n deep-research-agent svc/deep-research-agent 8081:8081 &
 
 # Langfuse
 kubectl port-forward -n langfuse svc/langfuse-web 3000:3000 &

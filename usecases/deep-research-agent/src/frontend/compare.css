@@ -1,0 +1,194 @@
+/* Split-screen summarization A/B comparison — layered on top of style.css */
+
+.nav-link {
+    margin-left: auto;
+    color: var(--accent);
+    text-decoration: none;
+    font-size: 0.85rem;
+}
+.nav-link:hover { text-decoration: underline; }
+
+.compare-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 1.25rem 1.5rem 3rem;
+}
+
+.compare-input {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1rem;
+}
+.compare-input label {
+    display: block;
+    font-size: 0.85rem;
+    color: var(--text2);
+    margin-bottom: 0.5rem;
+}
+.compare-input textarea {
+    width: 100%;
+    box-sizing: border-box;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: 8px;
+    color: var(--text);
+    padding: 0.6rem 0.75rem;
+    font-size: 0.95rem;
+    resize: vertical;
+}
+.compare-input .input-actions {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 0.6rem;
+}
+
+/* ── Verdict / savings banner ─────────────────────────────────── */
+.verdict {
+    display: grid;
+    grid-template-columns: 1fr 1.2fr 1fr;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+.verdict-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.2rem;
+    padding: 0.75rem 1rem;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: 10px;
+}
+.verdict-savings {
+    background: rgba(115, 218, 202, 0.08);
+    border-color: var(--accent3);
+}
+.verdict-label {
+    font-size: 0.95rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text2);
+}
+.verdict-cost {
+    font-size: 1.7rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+}
+.verdict-savings .verdict-cost { color: var(--accent3); }
+/* Savings cell: percent is the large headline, dollars the smaller sub-line. */
+.verdict-pct {
+    font-size: 2.1rem;
+    font-weight: 800;
+    line-height: 1.05;
+    color: var(--accent3);
+    font-variant-numeric: tabular-nums;
+}
+.verdict-delta {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text2);
+    font-variant-numeric: tabular-nums;
+}
+
+/* ── Two side-by-side panels ──────────────────────────────────── */
+.panels {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    align-items: start;
+}
+.panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1rem;
+    min-height: 200px;
+    /* Grid items default to min-width:auto, so long report content (URLs, code,
+       tables) can push a column past its 1fr share and make it wider than the
+       other. min-width:0 + overflow keep both columns exactly equal. */
+    min-width: 0;
+    overflow: hidden;
+}
+/* Wrap/scroll long report content instead of stretching the column. */
+.panel-report { overflow-x: auto; }
+.panel-report pre { white-space: pre-wrap; word-break: break-word; }
+.panel-report table { display: block; overflow-x: auto; max-width: 100%; }
+#panel-with  { border-top: 3px solid var(--accent3); }
+#panel-without { border-top: 3px solid var(--accent4); }
+
+.panel-head {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 0.6rem;
+}
+.panel-title {
+    font-weight: 700;
+    font-size: 1.25rem;
+    color: var(--text);
+}
+.panel-badge {
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    padding: 0.12rem 0.45rem;
+    border-radius: 4px;
+    margin-left: auto;
+}
+.panel-badge.on  { background: rgba(115, 218, 202, 0.15); color: var(--accent3); }
+.panel-badge.off { background: rgba(255, 158, 100, 0.15); color: var(--accent4); }
+
+.panel-costbar {
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+    padding: 0.5rem 0.7rem;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: 8px;
+    margin-bottom: 0.6rem;
+}
+.panel-costbar .panel-cost {
+    font-size: 1.35rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--accent3);
+    transition: color 0.25s ease;
+}
+.panel-costbar .panel-cost.bump { color: #fff; }
+#panel-without .panel-costbar .panel-cost { color: var(--accent4); }
+
+.panel-status {
+    display: inline-block;
+    margin-bottom: 0.5rem;
+}
+.panel .progress-bar-container {
+    height: 4px;
+    background: var(--surface3);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-bottom: 0.6rem;
+}
+.panel .panel-progress {
+    height: 100%;
+    background: var(--accent);
+    width: 0%;
+    transition: width 0.4s ease;
+}
+
+.panel-report {
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border);
+    max-height: 460px;
+    overflow-y: auto;
+}
+
+@media (max-width: 900px) {
+    .panels { grid-template-columns: 1fr; }
+    .verdict { grid-template-columns: 1fr; }
+}

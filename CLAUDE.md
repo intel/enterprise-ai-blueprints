@@ -33,8 +33,15 @@ usecases/<name>/
 docs/                        # ai-solutions-setup, endpoints-reference, observability-langfuse, adding-new-usecases
 ```
 
-Current use cases: `coding-agent-maf` (Agent Sandbox code execution, Redis memory, optional KubeRay)
-and `banking-assistant` (FastMCP sidecar, Redis memory).
+Current use cases (directory = namespace; host in parentheses):
+- `coding-agent-maf` (`coding-agent.<base>`): Microsoft Agent Framework, Agent Sandbox code execution, Redis memory, optional KubeRay.
+- `banking-assistant` (`banking-assistant.<base>`): FastMCP sidecar, Redis memory.
+- `coding-agent` (`coding-agent-langgraph.<base>`, release `coding-agent-langgraph`): LangGraph, Agent Sandbox code execution, API-only with a Bearer `DEVUI_AUTH_TOKEN`.
+- `customer-support-agent` (`customer-support-agent.<base>`): Streamlit UI at `/`, FastAPI at `/api`+`/v1`, SQLite demo data, RediSearch memory with the `bge-base-en` embedding model. It has **no user auth**.
+- `deep-research-agent` (`deep-research-agent.<base>`, optional `-dashboard` host): LangGraph web research; needs `TAVILY_API_KEY`; SQLite on a PVC; 3600s route timeout for SSE.
+
+`customer-support-agent` and `deep-research-agent` read `LLM_BASE_URL`/`LLM_API_KEY`/`LLM_MODEL`. Their
+deploy.sh maps the dispatcher's `OPENAI_BASE_URL`/`OPENAI_API_KEY`/`MODEL_NAME` onto those.
 
 ## Platform contract (AI Solutions 1.2 / agent-toolkit 2.0.0)
 

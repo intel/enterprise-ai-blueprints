@@ -1,0 +1,9 @@
+streamlit
+openai
+fastapi
+uvicorn[standard]
+# Long-term memory: RediSearch vector store (cluster redis-stack) + gateway embeddings
+redis>=5.0
+# Parallel tool execution via the agent-toolkit KubeRay cluster (kuberay_enabled) (Ray 2.40.0 on the cluster).
+# Client lib must match the cluster's Ray version; the image is Python 3.12 to match.
+ray[client]==2.40.0

@@ -1,0 +1,33 @@
+# LangGraph Agent Framework
+langgraph>=0.4.0
+langchain-core>=0.3.0
+langchain-openai>=0.3.0
+
+# OpenAI (for OpenAI-compatible chat completions)
+openai>=1.0.0
+
+# Redis for persistent memory / checkpointing
+redis>=5.0.0
+redisvl>=0.1.0
+
+# Agent Sandbox — isolated code execution in Kubernetes sandbox pods
+k8s-agent-sandbox==0.4.6
+# Pin kubernetes client to 35.x — v36.0.0 has a bug where load_incluster_config()
+# stores the bearer token under api_key['authorization'] but auth_settings() looks
+# for api_key['BearerToken'], so requests go out as system:anonymous inside a pod.
+kubernetes>=35.0.0,<36
+
+# Ray — distributed parallel task execution
+# Version is pinned to match the KubeRay cluster image (rayproject/ray:2.9.0-py310).
+# Bump both this pin and kuberay_ray_image in config.agent-toolkit.yaml (AI Solutions) together.
+ray[default]==2.40.0
+
+# Observability
+langfuse>=4.6.0
+
+# Utilities
+python-dotenv>=1.0.0
+
+# Web server for API endpoints
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0

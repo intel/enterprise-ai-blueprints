@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Heterogenous Deep Research Agent on AI Solutions</title>
+    <link rel="stylesheet" href="style.css?v=20260702i">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-content">
+            <span class="nav-logo">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="10" cy="10" r="3" fill="#7aa2f7"/>
+                    <circle cx="10" cy="10" r="7" stroke="#7aa2f7" stroke-width="1.5" fill="none" opacity="0.4"/>
+                    <circle cx="10" cy="10" r="10" stroke="#7aa2f7" stroke-width="1" fill="none" opacity="0.2"/>
+                </svg>
+            </span>
+            <span class="nav-title">Heterogenous Deep Research Agent on AI Solutions</span>
+            <span class="nav-version">v1.13</span>
+            <a class="nav-link" href="compare.html" style="margin-left:auto;color:var(--accent);text-decoration:none;font-size:0.85rem;">Summarization A/B &rarr;</a>
+            <div class="vllm-status" id="vllm-status"></div>
+        </div>
+    </nav>
+
+    <div class="layout">
+        <aside id="sidebar" class="sidebar">
+            <div class="sidebar-header">
+                <h3>Sessions</h3>
+                <div class="sidebar-header-btns">
+                    <button id="new-research-btn" class="new-btn" onclick="showNewResearch()">+ New</button>
+                    <button class="clear-btn" onclick="clearHistory()" title="Clear all session history">Clear</button>
+                </div>
+            </div>
+            <div id="session-list" class="session-list"></div>
+        </aside>
+
+        <main class="container">
+            <!-- Query input -->
+            <section id="input-section">
+                <label for="query-input">Research Query</label>
+                <textarea id="query-input" rows="3" placeholder='What would you like to research? e.g., "What are the latest advances in solid-state batteries?"'></textarea>
+                <div class="input-actions">
+                    <button id="research-btn" onclick="startResearch()">
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style="margin-right:6px">
+                            <circle cx="6" cy="6" r="4.5" stroke="currentColor" stroke-width="1.5"/>
+                            <line x1="9.5" y1="9.5" x2="13" y2="13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                        </svg>
+                        Research
+                    </button>
+                    <span class="input-hint">Enter to submit &middot; Shift+Enter for newline</span>
+                </div>
+            </section>
+
+            <!-- Active run: thinking panel + status label -->
+            <section id="progress-section" class="hidden">
+                <!-- Query displayed above progress bar -->
+                <div id="active-query" class="active-query hidden"></div>
+
+                <!-- Running Bedrock cost — sits directly below the query, climbs live as the agent calls Bedrock -->
+                <div id="cost-bar" class="cost-bar">
+                    <span class="cost-bar-label">Bedrock cost this run</span>
+                    <span id="cost-bar-amount" class="cost-bar-amount">$0.000</span>
+                    <span id="cost-bar-tokens" class="cost-bar-tokens"></span>
+                    <span id="cost-bar-time" class="cost-bar-time"></span>
+                </div>
+
+                <div class="progress-header">
+                    <div id="progress-status" class="status-badge">pending</div>
+                    <div class="progress-bar-container">
+                        <div id="progress-bar" class="progress-bar" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <!-- Growing list of pipeline steps (tool_name, hw, model, in/out tokens) -->
+                <div id="steps-list" class="steps-list hidden"></div>
+
+                <!-- Activity log (hidden by default, toggled by clicking agent-status) -->
+                <!-- agent-status elements kept in DOM (hidden) so JS refs don't null-crash -->
+                <div id="agent-status" class="agent-status hidden" style="display:none!important">
+                    <span id="agent-component"></span>
+                    <span id="agent-hardware"></span>
+                    <span id="agent-model"></span>
+                    <span id="agent-tps"></span>
+                    <span id="log-toggle-icon"></span>
+                </div>
+
+                <!-- Activity log (hidden by default) -->                <div id="progress-log" class="progress-log hidden"></div>
+
+                <!-- Live per-hardware token/TPS summary — updated after each LLM call -->
+                <div id="hw-summary" class="hw-summary hidden"></div>
+
+                <!-- VS Code Copilot-style thinking panel — kept at the bottom, below the hardware stats -->
+                <div id="thinking-container" class="thinking-container hidden">
+                    <div class="thinking-header" onclick="toggleThinking()">
+                        <div class="thinking-header-left">
+                            <span id="thinking-spinner" class="thinking-spinner"></span>
+                            <span id="thinking-title" class="thinking-title">Thinking&hellip;</span>
+                        </div>
+                        <span id="thinking-chevron" class="thinking-chevron">&#8964;</span>
+                    </div>
+                    <div id="thinking-body" class="thinking-body">
+                        <pre id="thinking-text" class="thinking-text"></pre>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Error -->
+            <section id="error-section" class="hidden">
+                <div class="section-label">Error</div>
+                <div id="error-message" class="error-box"></div>
+            </section>
+
+            <!-- Report -->
+            <section id="report-section" class="hidden">
+                <div id="report-content" class="report-content"></div>
+            </section>
+        </main>
+    </div>
+
+    <script src="app.js?v=20260702l"></script>
+</body>
+</html>

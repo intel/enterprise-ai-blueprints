@@ -64,6 +64,9 @@ cluster (most endpoints are auto-discovered), and deploy.
       │   (ambient-mesh namespaces)  │
       │   • coding-agent-maf         │
       │   • banking-assistant        │
+      │   • coding-agent (LangGraph) │
+      │   • customer-support-agent   │
+      │   • deep-research-agent      │
       │   • (your use case here)     │
       └──────────────────────────────┘
 ```
@@ -134,6 +137,9 @@ in-cluster service URLs.
 |---|---|---|---|---|
 | [coding-agent-maf](usecases/coding-agent-maf/) | AI Solutions · Agent Toolkit | AI coding assistant (Microsoft Agent Framework) that writes, executes, and debugs Python in sandboxed Kubernetes pods, with persistent Redis memory | 8090 (DevUI) | [README](usecases/coding-agent-maf/README.md) |
 | [banking-assistant](usecases/banking-assistant/) | AI Solutions · Agent Toolkit | Conversational banking assistant that answers account/loan queries and moves funds via a FastMCP banking-tools sidecar (MCP client/server demo) | 8090 (DevUI) | [README](usecases/banking-assistant/README.md) |
+| [coding-agent](usecases/coding-agent/) | AI Solutions · Agent Toolkit | AI coding assistant (LangGraph) that writes and runs Python in Agent Sandbox pods; API-only (OpenAI-compatible `/v1/chat/completions` + `/v1/responses`, bearer token), host `coding-agent-langgraph.<base>` | 8090 (API) | [README](usecases/coding-agent/README.md) |
+| [customer-support-agent](usecases/customer-support-agent/) | AI Solutions · Agent Toolkit | E-commerce support agent with 40 tools over a SQLite demo DB, RediSearch long-term memory (`bge-base-en` embeddings) and parallel tool execution; **no user auth**, host `customer-support-agent.<base>` | 8501 (Streamlit UI), 8502 (API) | [README](usecases/customer-support-agent/README.md) |
+| [deep-research-agent](usecases/deep-research-agent/) | AI Solutions · Agent Toolkit | Autonomous web-research agent (LangGraph) that searches the web (Tavily key required), scores sources and writes a cited report, streamed over SSE; host `deep-research-agent.<base>` (+ optional `-dashboard`) | 8081 (UI + API), 8082 (dashboard) | [README](usecases/deep-research-agent/README.md) |
 
 > **Categories** group blueprints by the primary capability they demonstrate
 > (e.g. `AI Solutions · Agent Toolkit`, `AI Solutions · Inference`, `RAG`). Adding a use case? Pick or propose
@@ -253,7 +259,13 @@ Until then, install AI Solutions (agent-toolkit) first and deploy blueprints wit
     │   ├── examples/
     │   ├── helm-chart/
     │   └── src/               # source + Dockerfile
-    └── banking-assistant/
+    ├── banking-assistant/
+    │   └── ...
+    ├── coding-agent/          # LangGraph coding agent (host coding-agent-langgraph.<base>)
+    │   └── ...
+    ├── customer-support-agent/
+    │   └── ...
+    └── deep-research-agent/
         └── ...
 ```
 
@@ -282,9 +294,11 @@ reference, and troubleshooting.
 These limitations are intentional for sample code and are documented in each
 use case README.
 
-- **Demo-level authentication only.** The DevUI/API is protected by a single
-  bearer token generated at deploy time. There is no user management, SSO,
-  role-based access, rate limiting, or audit logging.
+- **Demo-level authentication only.** Where a blueprint has auth, it is a single
+  shared token: a bearer token generated at deploy time for coding-agent-maf,
+  banking-assistant and coding-agent, and optional `API_KEYS` for
+  deep-research-agent. **customer-support-agent has no authentication at all.**
+  There is no user management, SSO, role-based access, rate limiting, or audit logging.
 - **Banking assistant has no per-user authorization.** Any caller can query any
   synthetic `user_id` and move synthetic funds. The MCP server is reachable only
   inside the pod. Never connect it to a real banking system.
@@ -295,8 +309,8 @@ use case README.
   should be treated as untrusted.
 - **Self-signed TLS by default.** TLS is terminated at the platform's Envoy
   Gateway with a self-signed wildcard certificate unless you configure your own.
-  The blueprint routes opt out of the gateway's LiteLLM-key check and rely on the
-  DevUI token alone.
+  The blueprint routes opt out of the gateway's LiteLLM-key check so browsers can
+  open them, and rely on each app's own auth (see above).
 - **Ray parallel execution is optional and off by default** (`RAY_ENABLED=false`).
   When Ray is not connected, the parallel tool falls back to sequential execution
   inside the agent pod.

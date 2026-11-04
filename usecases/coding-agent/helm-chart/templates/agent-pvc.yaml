@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "coding-agent.fullname" . }}-workspace
+  labels:
+    {{- include "coding-agent.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  {{- if .Values.agent.workspace.storageClassName }}
+  storageClassName: {{ .Values.agent.workspace.storageClassName | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.agent.workspace.size }}

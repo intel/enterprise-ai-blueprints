@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "deep-research-agent.fullname" . }}
+  labels:
+    {{- include "deep-research-agent.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type | default "ClusterIP" }}
+  ports:
+    - name: http
+      port: {{ .Values.agent.port }}
+      targetPort: http
+      protocol: TCP
+      {{- if and (eq (.Values.service.type | default "ClusterIP") "NodePort") .Values.service.nodePort }}
+      nodePort: {{ .Values.service.nodePort }}
+      {{- end }}
+    {{- if .Values.agent.evalDashboard.enabled }}
+    - name: dashboard
+      port: {{ .Values.agent.evalDashboard.port }}
+      targetPort: dashboard
+      protocol: TCP
+      {{- if and (eq (.Values.service.type | default "ClusterIP") "NodePort") .Values.service.dashboardNodePort }}
+      nodePort: {{ .Values.service.dashboardNodePort }}
+      {{- end }}
+    {{- end }}
+  selector:
+    {{- include "deep-research-agent.selectorLabels" . | nindent 4 }}

@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Heterogenous Deep Research Agent on AI Solutions</title>
+    <link rel="stylesheet" href="style.css?v=20260702i">
+    <link rel="stylesheet" href="compare.css?v=20260702j">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-content">
+            <span class="nav-logo">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="10" cy="10" r="3" fill="#7aa2f7"/>
+                    <circle cx="10" cy="10" r="7" stroke="#7aa2f7" stroke-width="1.5" fill="none" opacity="0.4"/>
+                    <circle cx="10" cy="10" r="10" stroke="#7aa2f7" stroke-width="1" fill="none" opacity="0.2"/>
+                </svg>
+            </span>
+            <span class="nav-title">Heterogenous Deep Research Agent on AI Solutions</span>
+            <span class="nav-version">compare</span>
+            <a class="nav-link" href="index.html">&larr; Single view</a>
+        </div>
+    </nav>
+
+    <main class="compare-container">
+        <!-- Query input -->
+        <section class="compare-input">
+            <label for="query-input">Research Query</label>
+            <textarea id="query-input" rows="2" placeholder='e.g., "What are the environmental tradeoffs of lithium mining for EV batteries?"'></textarea>
+            <div class="input-actions">
+                <button id="research-btn" onclick="startCompare()">Run comparison</button>
+                <span class="input-hint">Both runs use the same query &amp; Bedrock model; only summarization differs.</span>
+            </div>
+        </section>
+
+        <!-- Verdict / savings summary -->
+        <section id="verdict" class="verdict hidden">
+            <div class="verdict-cell">
+                <span class="verdict-label">Without Xeon summarization</span>
+                <span id="verdict-without" class="verdict-cost">$0.000</span>
+            </div>
+            <div class="verdict-cell verdict-savings">
+                <span class="verdict-label">Savings</span>
+                <span id="verdict-pct" class="verdict-pct">—</span>
+                <span id="verdict-delta" class="verdict-delta"></span>
+            </div>
+            <div class="verdict-cell">
+                <span class="verdict-label">With Xeon summarization</span>
+                <span id="verdict-with" class="verdict-cost">$0.000</span>
+            </div>
+        </section>
+
+        <!-- Two panels — left: without summarization, right: with summarization -->
+        <section class="panels">
+            <div class="panel" id="panel-without">
+                <div class="panel-head">
+                    <span class="panel-title">Without Xeon summarization</span>
+                    <span class="panel-badge off">summarize: OFF</span>
+                </div>
+                <div class="panel-costbar">
+                    <span class="cost-bar-label">Bedrock cost</span>
+                    <span class="cost-bar-amount panel-cost">$0.000</span>
+                    <span class="cost-bar-tokens panel-tokens"></span>
+                </div>
+                <div class="panel-status status-badge">idle</div>
+                <div class="progress-bar-container"><div class="progress-bar panel-progress" style="width:0%"></div></div>
+                <div class="steps-list panel-steps hidden"></div>
+                <!-- Live agent output-token stream (like the single view's thinking box) -->
+                <div class="thinking-container panel-thinking hidden">
+                    <div class="thinking-header">
+                        <div class="thinking-header-left">
+                            <span class="thinking-spinner panel-think-spinner"></span>
+                            <span class="thinking-title panel-think-title">Thinking&hellip;</span>
+                        </div>
+                    </div>
+                    <div class="thinking-body">
+                        <pre class="thinking-text panel-think-text"></pre>
+                    </div>
+                </div>
+                <div class="report-content panel-report hidden"></div>
+            </div>
+
+            <div class="panel" id="panel-with">
+                <div class="panel-head">
+                    <span class="panel-title">With Xeon summarization</span>
+                    <span class="panel-badge on">summarize: ON</span>
+                </div>
+                <div class="panel-costbar">
+                    <span class="cost-bar-label">Bedrock cost</span>
+                    <span class="cost-bar-amount panel-cost">$0.000</span>
+                    <span class="cost-bar-tokens panel-tokens"></span>
+                </div>
+                <div class="panel-status status-badge" >idle</div>
+                <div class="progress-bar-container"><div class="progress-bar panel-progress" style="width:0%"></div></div>
+                <div class="steps-list panel-steps hidden"></div>
+                <!-- Live agent output-token stream (like the single view's thinking box) -->
+                <div class="thinking-container panel-thinking hidden">
+                    <div class="thinking-header">
+                        <div class="thinking-header-left">
+                            <span class="thinking-spinner panel-think-spinner"></span>
+                            <span class="thinking-title panel-think-title">Thinking&hellip;</span>
+                        </div>
+                    </div>
+                    <div class="thinking-body">
+                        <pre class="thinking-text panel-think-text"></pre>
+                    </div>
+                </div>
+                <div class="report-content panel-report hidden"></div>
+            </div>
+        </section>
+    </main>
+
+    <script src="compare.js?v=20260702l"></script>
+</body>
+</html>

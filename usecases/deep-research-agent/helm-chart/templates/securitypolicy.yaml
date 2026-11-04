@@ -1,0 +1,24 @@
+{{- if and .Values.httpRoute.enabled .Values.httpRoute.bypassGatewayAuth }}
+{{- $fullname := include "deep-research-agent.fullname" . }}
+# Empty route-level SecurityPolicy: overrides the gateway-wide 'gateway-auth'
+# policy (LiteLLM key check) for this blueprint's routes only, so browsers can
+# open the UI. App-level auth is agent.apiKeys (X-API-Key on /api/*). Same
+# pattern AI Solutions uses for LiteLLM/Langfuse.
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: {{ $fullname }}-no-gateway-auth
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "deep-research-agent.labels" . | nindent 4 }}
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: {{ $fullname }}
+    {{- if and .Values.agent.evalDashboard.enabled .Values.httpRoute.dashboardHost }}
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: {{ $fullname }}-dashboard
+    {{- end }}
+{{- end }}
