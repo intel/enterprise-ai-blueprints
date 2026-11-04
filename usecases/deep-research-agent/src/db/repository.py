@@ -164,8 +164,8 @@ class SearchCacheRepository:
         for row in result.scalars():
             try:
                 out[row.key] = json.loads(row.results_json)
-            except Exception:
-                pass
+            except (ValueError, TypeError) as exc:
+                logger.debug("Skipping unreadable cache row %s: %s", row.key, exc)
         return out
 
     async def clear(self) -> int:

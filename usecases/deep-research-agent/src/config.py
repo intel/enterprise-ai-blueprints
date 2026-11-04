@@ -75,7 +75,7 @@ class Settings(BaseSettings):
     agent_max_tokens: int = 1024
 
     # Server
-    host: str = "0.0.0.0"
+    host: str = "0.0.0.0"  # nosec B104 - containerized service must bind all interfaces to be reachable via its Service
     port: int = 8081
 
     # Auth

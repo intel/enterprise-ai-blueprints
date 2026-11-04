@@ -95,8 +95,8 @@ def _ensure_index() -> bool:
             _redis.ft(MEMORY_INDEX).info()
             _available = True
             return True
-        except Exception:
-            pass
+        except redis.exceptions.ResponseError:
+            pass  # "Unknown index name" — create it below
 
         schema = (
             TagField("customer_id"),

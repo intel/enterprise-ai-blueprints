@@ -80,8 +80,8 @@ def _coerce_to_str_list(v: object) -> list[str]:
             parsed = ast.literal_eval(v)
             if isinstance(parsed, list):
                 return [str(x) for x in parsed]
-        except Exception:
-            pass
+        except (ValueError, TypeError, SyntaxError, MemoryError, RecursionError):
+            pass  # not a list literal — treat as a single string
         return [v]
     return list(v)  # type: ignore[arg-type]
 

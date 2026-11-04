@@ -68,8 +68,8 @@ def _patch_router_auth() -> None:
         _orig_init(self, *args, **kwargs)
         try:
             self.session.headers["Authorization"] = f"Bearer {SANDBOX_ROUTER_TOKEN}"
-        except Exception:  # pragma: no cover - defensive
-            pass
+        except Exception as exc:  # pragma: no cover - defensive
+            print(f"[Sandbox] WARNING: could not set sandbox-router auth header: {exc}")
 
     _conn.SandboxConnector.__init__ = _init_with_auth
     print("[Sandbox] Sandbox-router bearer-token auth enabled.")
@@ -199,7 +199,7 @@ def execute_python_code_parallel(tasks: List[str]) -> str:
             def _run_task(code: str, idx: int) -> dict:
                 import subprocess, sys, tempfile, os, time as _time
                 start = _time.monotonic()
-                workspace = os.getenv("WORKSPACE_DIR", "/tmp")
+                workspace = os.getenv("WORKSPACE_DIR") or tempfile.gettempdir()
                 with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False, dir=workspace) as f:
                     f.write(code)
                     tmp = f.name
@@ -226,7 +226,7 @@ def execute_python_code_parallel(tasks: List[str]) -> str:
                     lines.append(f"[stderr] {r['stderr'].rstrip()}")
             return "\n".join(lines)
         except Exception as e:
-            pass  # fall through to sequential
+            print(f"[Ray] WARNING: parallel execution failed, running sequentially: {e}")
 
     # Sequential fallback
     lines = [f"Sequential fallback — Ray not connected ({len(tasks)} tasks)\n"]

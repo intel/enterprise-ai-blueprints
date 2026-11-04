@@ -59,8 +59,8 @@ def _patch_router_auth() -> None:
         _orig_init(self, *args, **kwargs)
         try:
             self.session.headers["Authorization"] = f"Bearer {SANDBOX_ROUTER_TOKEN}"
-        except Exception:  # pragma: no cover - defensive
-            pass
+        except Exception as exc:  # pragma: no cover - defensive
+            print(f"[Sandbox] WARNING: could not set sandbox-router auth header: {exc}")
 
     _conn.SandboxConnector.__init__ = _init_with_auth
     print("[Sandbox] Sandbox-router bearer-token auth enabled.")

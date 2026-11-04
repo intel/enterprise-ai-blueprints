@@ -98,7 +98,8 @@ def update_customer_address(customer_id: str, address_type: str, street: str,
 
     new_address = json.dumps({"street": street, "city": city, "state": state, "zip": zip, "country": country})
     col = "shipping_address" if address_type == "shipping" else "billing_address"
-    execute(f"UPDATE customers SET {col} = ? WHERE id = ?", (new_address, customer_id))
+    # col is one of two literal column names, never user input.
+    execute(f"UPDATE customers SET {col} = ? WHERE id = ?", (new_address, customer_id))  # nosec B608 - only literal SQL fragments are interpolated; all values are bound parameters
 
     return {
         "updated": True,

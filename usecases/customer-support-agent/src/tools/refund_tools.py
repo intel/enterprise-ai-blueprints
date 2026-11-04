@@ -74,7 +74,7 @@ def initiate_return(order_id: str, item_ids: list, reason: str) -> dict:
     if not order:
         return {"error": f"Order {order_id} not found"}
 
-    items = query_all("SELECT * FROM order_items WHERE order_id = ? AND id IN ({})".format(
+    items = query_all("SELECT * FROM order_items WHERE order_id = ? AND id IN ({})".format(  # nosec B608 - only '?' placeholders are interpolated
         ",".join("?" * len(item_ids))), (order_id, *item_ids))
 
     if not items:

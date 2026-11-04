@@ -34,7 +34,7 @@ async def _emit_safe(cb, event: ProgressEvent) -> None:
     try:
         await cb(event)
     except Exception:
-        pass
+        logger.debug("Progress callback failed (ignored)", exc_info=True)
 
 
 def _fire(cb, event: ProgressEvent) -> None:
@@ -413,7 +413,7 @@ class LLMClient:
                         resp = response_model.model_construct()
                         _parsed = True
             except Exception:
-                pass
+                logger.debug("%s: schema echo-back check failed", caller, exc_info=True)
 
             if not _parsed:
                 logger.warning("%s: JSON parse failed, retrying via instructor", caller)

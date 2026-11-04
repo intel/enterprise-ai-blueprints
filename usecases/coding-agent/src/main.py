@@ -322,7 +322,7 @@ async def _stream_responses(input_text: str, config: dict, model: Optional[str])
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    host = os.getenv("DEVUI_HOST", "0.0.0.0")
+    host = os.getenv("DEVUI_HOST", "0.0.0.0")  # nosec B104 - containerized service must bind all interfaces to be reachable via its Service
     port = int(os.getenv("DEVUI_PORT", "8090"))
     auto_open = os.getenv("AUTO_OPEN_BROWSER", "true").lower() != "false"
 

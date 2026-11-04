@@ -163,8 +163,8 @@ def _compute_row(idx: int, m: dict, workspace: str = "") -> dict:
             from datetime import datetime, timezone, timedelta
             dt = datetime.fromisoformat(ts_utc).astimezone(timezone.utc)
             query_time_il = (dt + timedelta(hours=2)).strftime("%Y-%m-%d %H:%M") + " IL"
-        except Exception:
-            pass
+        except (ValueError, TypeError):
+            pass  # unparseable timestamp — leave the column blank
 
     # HW label — comma-joined hardware keys (e.g. "XPU", "XPU, Xeon")
     hw_summary = m.get("hw_summary", {}) or {}
@@ -235,8 +235,8 @@ def _get_status_json() -> dict:
             m = json.loads(fp.read_text())
             workspace = _dir_to_workspace.get(fp.parent, "")
             rows.append(_compute_row(idx, m, workspace=workspace))
-        except Exception:
-            continue
+        except Exception as exc:
+            print(f"Skipping unreadable metrics file {fp}: {exc}", file=sys.stderr)
     return {
         "meta": {"total": len(rows), "last_updated": time.strftime("%H:%M:%S")},
         "rows": rows,
@@ -954,9 +954,12 @@ setInterval(poll, 3000);
 
 # ── HTTP server ────────────────────────────────────────────────
 
+# Vendored JS for the dashboard, read from a directory the app controls rather
+# than a world-writable /tmp path (override with DASHBOARD_VENDOR_DIR).
+_VENDOR_DIR = pathlib.Path(os.getenv("DASHBOARD_VENDOR_DIR", str(pathlib.Path(__file__).resolve().parent / "vendor")))
 _VENDOR = {
-    "/vendor/chart.js":   ("/tmp/chart.umd.min.js",   "application/javascript"),
-    "/vendor/mermaid.js": ("/tmp/mermaid.min.js",      "application/javascript"),
+    "/vendor/chart.js":   (str(_VENDOR_DIR / "chart.umd.min.js"), "application/javascript"),
+    "/vendor/mermaid.js": (str(_VENDOR_DIR / "mermaid.min.js"),   "application/javascript"),
 }
 
 
@@ -992,8 +995,8 @@ class _Handler(http.server.BaseHTTPRequestHandler):
                         body = _markdown_page(session_id, md, m.get("query", "")).encode()
                         self._send(200, "text/html; charset=utf-8", body)
                         return
-                except Exception:
-                    pass
+                except (OSError, ValueError) as exc:
+                    print(f"Could not render report {fp}: {exc}", file=sys.stderr)
             self.send_error(404, "Report not available")
 
         elif self.path in _VENDOR:
@@ -1041,7 +1044,7 @@ def main():
 
     LIVE_DIR.mkdir(parents=True, exist_ok=True)
 
-    server = http.server.ThreadingHTTPServer(("0.0.0.0", args.port), _Handler)
+    server = http.server.ThreadingHTTPServer(("0.0.0.0", args.port), _Handler)  # nosec B104 - containerized service must bind all interfaces to be reachable via its Service
     print(f"Dashboard: http://localhost:{args.port}", file=sys.stderr)
     try:
         server.serve_forever()

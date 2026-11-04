@@ -428,4 +428,4 @@ def serve_ui_static(path: str):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=API_PORT)
+    uvicorn.run(app, host="0.0.0.0", port=API_PORT)  # nosec B104 - containerized service must bind all interfaces to be reachable via its Service

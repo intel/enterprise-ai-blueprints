@@ -85,7 +85,7 @@ def run_query(idx: int, query: str) -> dict:
 
     try:
         result = subprocess.run(
-            ["python", "scripts/main_example.py", "--research_query", query],
+            [sys.executable, "scripts/main_example.py", "--research_query", query],
             capture_output=True,
             text=True,
             timeout=TIMEOUT,

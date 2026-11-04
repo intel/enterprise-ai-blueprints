@@ -85,7 +85,7 @@ def get_restock_estimate(product_id: str) -> dict:
         }
 
     # Simulate restock estimate
-    days_until_restock = random.randint(7, 21)
+    days_until_restock = random.randint(7, 21)  # nosec B311 - simulated demo value, not security-sensitive
     restock_date = (datetime.now() + timedelta(days=days_until_restock)).strftime("%Y-%m-%d")
 
     return {

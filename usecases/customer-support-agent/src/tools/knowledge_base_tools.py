@@ -29,7 +29,7 @@ def search_knowledge_base(query: str, category: str = None) -> dict:
 
     where = " WHERE " + " AND ".join(conditions)
     articles = query_all(
-        f"SELECT id, title, category, content, tags, helpful_count FROM knowledge_base{where} ORDER BY helpful_count DESC LIMIT 5",
+        f"SELECT id, title, category, content, tags, helpful_count FROM knowledge_base{where} ORDER BY helpful_count DESC LIMIT 5",  # nosec B608 - only literal SQL fragments are interpolated; all values are bound parameters
         tuple(params)
     )
 

@@ -49,7 +49,7 @@ def search_products(query: str = "", category: str = None, min_price: float = No
              "rating": "rating_avg DESC", "name": "name ASC"}.get(sort_by, "rating_avg DESC")
 
     products = query_all(
-        f"SELECT id, name, category, brand, base_price, rating_avg, review_count, description FROM products{where} ORDER BY {order} LIMIT 10",
+        f"SELECT id, name, category, brand, base_price, rating_avg, review_count, description FROM products{where} ORDER BY {order} LIMIT 10",  # nosec B608 - only literal SQL fragments are interpolated; all values are bound parameters
         tuple(params)
     )
     return {"total_results": len(products), "products": products}

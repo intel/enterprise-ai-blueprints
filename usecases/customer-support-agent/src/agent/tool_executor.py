@@ -57,6 +57,8 @@ def _run_tool_via_api(name: str, arguments: Dict[str, Any], api_url: str) -> Dic
     import urllib.request
     import json as _json
 
+    if not api_url.startswith(("http://", "https://")):
+        return {"error": f"refusing non-HTTP SELF_API_URL: {api_url}"}
     try:
         req = urllib.request.Request(
             f"{api_url}/api/v1/tools/{name}",
@@ -64,7 +66,7 @@ def _run_tool_via_api(name: str, arguments: Dict[str, Any], api_url: str) -> Dic
             headers={"Content-Type": "application/json"},
             method="POST",
         )
-        with urllib.request.urlopen(req, timeout=30) as resp:
+        with urllib.request.urlopen(req, timeout=30) as resp:  # nosec B310 - scheme checked above
             return _json.loads(resp.read().decode())
     except Exception as e:  # noqa: BLE001
         return {"error": f"remote tool execution failed: {e}"}
@@ -96,6 +98,8 @@ def _execute_ray(calls: List[Tuple[str, Dict[str, Any]]]) -> List[Dict[str, Any]
         import urllib.request
         import json as _json
 
+        if not url.startswith(("http://", "https://")):
+            return {"error": f"refusing non-HTTP SELF_API_URL: {url}"}
         try:
             req = urllib.request.Request(
                 f"{url}/api/v1/tools/{name}",
@@ -103,7 +107,7 @@ def _execute_ray(calls: List[Tuple[str, Dict[str, Any]]]) -> List[Dict[str, Any]
                 headers={"Content-Type": "application/json"},
                 method="POST",
             )
-            with urllib.request.urlopen(req, timeout=30) as resp:
+            with urllib.request.urlopen(req, timeout=30) as resp:  # nosec B310 - scheme checked above
                 return _json.loads(resp.read().decode())
         except Exception as e:  # noqa: BLE001
             return {"error": f"remote tool execution failed: {e}"}

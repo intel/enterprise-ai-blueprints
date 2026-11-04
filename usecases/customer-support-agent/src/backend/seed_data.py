@@ -9,7 +9,8 @@ from datetime import datetime, timedelta
 
 from backend.database import init_db, get_db
 
-random.seed(42)
+# Dedicated, seeded generator: synthetic demo data must be reproducible.
+_rng = random.Random(42)  # nosec B311 - deterministic demo data, not security-sensitive
 
 
 def _uid():
@@ -99,16 +100,16 @@ PAYMENT_METHODS = ["Visa ending in 4242", "Mastercard ending in 5555", "Amex end
 
 
 def _gen_address():
-    city, state, zip_code = random.choice(CITIES)
+    city, state, zip_code = _rng.choice(CITIES)
     return {
-        "street": f"{random.randint(100, 9999)} {random.choice(STREETS)}",
+        "street": f"{_rng.randint(100, 9999)} {_rng.choice(STREETS)}",
         "city": city, "state": state, "zip": zip_code, "country": "US"
     }
 
 
 def _gen_tracking():
-    prefix = random.choice(["1Z", "92", "78", "JD"])
-    return f"{prefix}{random.randint(100000000, 999999999)}"
+    prefix = _rng.choice(["1Z", "92", "78", "JD"])
+    return f"{prefix}{_rng.randint(100000000, 999999999)}"
 
 
 # ─── Knowledge Base Articles ─────────────────────────────────────────────────
@@ -178,14 +179,14 @@ def seed_all():
             conn.execute(
                 "INSERT INTO products (id, name, category, brand, base_price, description, specs, rating_avg, review_count) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (pid, p["name"], p["category"], p["brand"], p["base_price"], p["description"],
-                 json.dumps(p["specs"]), round(random.uniform(3.5, 4.9), 1), random.randint(20, 500))
+                 json.dumps(p["specs"]), round(_rng.uniform(3.5, 4.9), 1), _rng.randint(20, 500))
             )
             # Create 1-3 variants per product
-            for vi in range(random.randint(1, 3)):
+            for vi in range(_rng.randint(1, 3)):
                 vid = f"VAR-{pid}-{vi+1}"
-                color = random.choice(["Black", "Silver", "White", "Blue", "Space Gray"])
-                price_adj = random.choice([-50, 0, 0, 50, 100])
-                stock = random.randint(0, 150)
+                color = _rng.choice(["Black", "Silver", "White", "Blue", "Space Gray"])
+                price_adj = _rng.choice([-50, 0, 0, 50, 100])
+                stock = _rng.randint(0, 150)
                 conn.execute(
                     "INSERT INTO product_variants (id, product_id, sku, options, price, stock_quantity, is_available) VALUES (?, ?, ?, ?, ?, ?, ?)",
                     (vid, pid, f"SKU-{_uid()}", json.dumps({"color": color}),
@@ -196,17 +197,17 @@ def seed_all():
         customers = []
         for i in range(100):
             cid = f"CUST-{i+1:04d}"
-            fname = random.choice(FIRST_NAMES)
-            lname = random.choice(LAST_NAMES)
-            email = f"{fname.lower()}.{lname.lower()}{random.randint(1,99)}@{'gmail.com' if random.random() > 0.3 else 'outlook.com'}"
-            tier = random.choices(["bronze", "silver", "gold", "platinum"], weights=[50, 30, 15, 5])[0]
-            points = {"bronze": random.randint(0, 4999), "silver": random.randint(5000, 19999),
-                      "gold": random.randint(20000, 49999), "platinum": random.randint(50000, 80000)}[tier]
+            fname = _rng.choice(FIRST_NAMES)
+            lname = _rng.choice(LAST_NAMES)
+            email = f"{fname.lower()}.{lname.lower()}{_rng.randint(1,99)}@{'gmail.com' if _rng.random() > 0.3 else 'outlook.com'}"
+            tier = _rng.choices(["bronze", "silver", "gold", "platinum"], weights=[50, 30, 15, 5])[0]
+            points = {"bronze": _rng.randint(0, 4999), "silver": _rng.randint(5000, 19999),
+                      "gold": _rng.randint(20000, 49999), "platinum": _rng.randint(50000, 80000)}[tier]
             conn.execute(
                 "INSERT INTO customers (id, email, first_name, last_name, phone, shipping_address, billing_address, loyalty_tier, loyalty_points, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (cid, email, fname, lname, f"+1-{random.randint(200,999)}-{random.randint(100,999)}-{random.randint(1000,9999)}",
+                (cid, email, fname, lname, f"+1-{_rng.randint(200,999)}-{_rng.randint(100,999)}-{_rng.randint(1000,9999)}",
                  json.dumps(_gen_address()), json.dumps(_gen_address()), tier, points,
-                 _date(random.randint(30, 730)))
+                 _date(_rng.randint(30, 730)))
             )
             customers.append(cid)
 
@@ -215,23 +216,23 @@ def seed_all():
                     "delivered", "cancelled", "returned"]
         for i in range(500):
             oid = f"ORD-{2024 + i // 250}-{i+1:06d}"
-            cid = random.choice(customers)
-            status = random.choice(statuses)
-            days_ago = random.randint(1, 180)
+            cid = _rng.choice(customers)
+            status = _rng.choice(statuses)
+            days_ago = _rng.randint(1, 180)
             order_date = _date(days_ago)
-            num_items = random.randint(1, 4)
-            items = random.sample(range(len(PRODUCTS)), min(num_items, len(PRODUCTS)))
+            num_items = _rng.randint(1, 4)
+            items = _rng.sample(range(len(PRODUCTS)), min(num_items, len(PRODUCTS)))
             total = sum(PRODUCTS[idx]["base_price"] for idx in items)
-            carrier = random.choice(CARRIERS)
+            carrier = _rng.choice(CARRIERS)
             tracking = _gen_tracking() if status in ("shipped", "delivered") else None
-            est_delivery = _future_date(random.randint(1, 7)) if status in ("shipped", "processing") else (
-                _date(days_ago - random.randint(1, 5)) if status == "delivered" else None
+            est_delivery = _future_date(_rng.randint(1, 7)) if status in ("shipped", "processing") else (
+                _date(days_ago - _rng.randint(1, 5)) if status == "delivered" else None
             )
 
             conn.execute(
                 "INSERT INTO orders (id, customer_id, status, order_date, total, shipping_address, payment_method, tracking_number, carrier, estimated_delivery) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (oid, cid, status, order_date, round(total, 2), json.dumps(_gen_address()),
-                 random.choice(PAYMENT_METHODS), tracking, carrier, est_delivery)
+                 _rng.choice(PAYMENT_METHODS), tracking, carrier, est_delivery)
             )
 
             for item_idx in items:
@@ -240,7 +241,7 @@ def seed_all():
                 conn.execute(
                     "INSERT INTO order_items (id, order_id, product_id, product_name, quantity, unit_price, item_status) VALUES (?, ?, ?, ?, ?, ?, ?)",
                     (iid, oid, f"PROD-{item_idx+1:04d}", product["name"],
-                     random.randint(1, 2), product["base_price"],
+                     _rng.randint(1, 2), product["base_price"],
                      "returned" if status == "returned" else "active")
                 )
 
@@ -267,7 +268,7 @@ def seed_all():
             conn.execute(
                 "INSERT INTO knowledge_base (id, title, content, category, tags, helpful_count, view_count) VALUES (?, ?, ?, ?, ?, ?, ?)",
                 (f"KB-{i+1:04d}", article["title"], article["content"], article["category"],
-                 json.dumps(article["tags"]), random.randint(10, 500), random.randint(100, 5000))
+                 json.dumps(article["tags"]), _rng.randint(10, 500), _rng.randint(100, 5000))
             )
 
         # --- Promotions ---
@@ -278,14 +279,14 @@ def seed_all():
                 "INSERT INTO promotions (id, code, description, discount_type, discount_value, min_order, valid_from, valid_until, applicable_categories, usage_limit, usage_count) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (f"PROMO-{i+1:04d}", promo["code"], promo["description"], promo["discount_type"],
                  promo["discount_value"], promo["min_order"], valid_from, valid_until,
-                 json.dumps(promo["categories"]), promo["usage_limit"], random.randint(0, promo["usage_limit"] // 2))
+                 json.dumps(promo["categories"]), promo["usage_limit"], _rng.randint(0, promo["usage_limit"] // 2))
             )
 
         # --- Product Reviews ---
         for pid_idx in range(len(PRODUCTS)):
             pid = f"PROD-{pid_idx+1:04d}"
-            for _ in range(random.randint(3, 8)):
-                rating = random.choices([5, 4, 3, 2, 1], weights=[40, 30, 15, 10, 5])[0]
+            for _ in range(_rng.randint(3, 8)):
+                rating = _rng.choices([5, 4, 3, 2, 1], weights=[40, 30, 15, 10, 5])[0]
                 titles = {5: "Excellent!", 4: "Great product", 3: "Decent", 2: "Disappointed", 1: "Terrible"}
                 contents = {
                     5: "Absolutely love this product. Works perfectly and exceeded my expectations.",
@@ -296,8 +297,8 @@ def seed_all():
                 }
                 conn.execute(
                     "INSERT INTO product_reviews (id, product_id, customer_id, rating, title, content, verified_purchase, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                    (_uid(), pid, random.choice(customers), rating, titles[rating],
-                     contents[rating], random.random() > 0.2, _date(random.randint(1, 120)))
+                    (_uid(), pid, _rng.choice(customers), rating, titles[rating],
+                     contents[rating], _rng.random() > 0.2, _date(_rng.randint(1, 120)))
                 )
 
     print(f"Database seeded: {len(PRODUCTS)} products, 100 customers, 500 orders, {len(KB_ARTICLES)} KB articles, {len(PROMOTIONS)} promotions")
