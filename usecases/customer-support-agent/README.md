@@ -126,7 +126,7 @@ use case. See the [AI Solutions setup guide](../../docs/ai-solutions-setup.md).
 | Chat model | — | `llm_services_autodeploy_models` (default `["qwen2-5-coder-14b"]`) |
 | Embedding model `bge-base-en` (memory) | — | add `"bge-base-en"` to `llm_services_autodeploy_models` (optional — memory fails open) |
 | Redis Stack (memory) | `redis` | `redis_stack_enabled` |
-| KubeRay (optional) | `ray-system` | `kuberay_enabled` (only for `TOOL_EXECUTOR=ray`) |
+| KubeRay (optional) | `ray-system` | `kuberay_enabled` (only for `TOOL_EXECUTOR=ray`), plus `kuberay_ray_image: rayproject/ray:2.56.0-py312` to match the agent's Ray client (~=2.56.0) |
 | LiteLLM access from this namespace | — | add `customer-support-agent` to `litellm_allowed_namespaces` |
 
 Verify the prerequisites:

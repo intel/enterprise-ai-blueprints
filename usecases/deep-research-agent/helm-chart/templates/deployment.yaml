@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ include "deep-research-agent.fullname" . }}
+  namespace: {{ .Release.Namespace }}
   labels:
     {{- include "deep-research-agent.labels" . | nindent 4 }}
 spec:
@@ -35,7 +36,7 @@ spec:
       {{- end }}
       containers:
         - name: {{ .Chart.Name }}
-          image: "{{ .Values.agent.image.repository }}:{{ .Values.agent.image.tag }}"
+          image: "{{ .Values.agent.image.repository }}:{{ .Values.agent.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.agent.image.pullPolicy }}
           ports:
             - name: http
@@ -46,6 +47,21 @@ spec:
               containerPort: {{ .Values.agent.evalDashboard.port }}
               protocol: TCP
             {{- end }}
+          # Numeric/label settings are set here rather than in the ConfigMap: their
+          # key names (*_TOKENS, *PORT, *_HARDWARE) trip secret-detection scanners.
+          env:
+            - name: LLM_MAX_TOKENS
+              value: {{ .Values.agent.llm.maxTokens | quote }}
+            - name: REPORT_MAX_TOKENS
+              value: {{ .Values.agent.pipeline.reportMaxTokens | quote }}
+            - name: LLM_HARDWARE
+              value: {{ .Values.agent.llm.hardware | quote }}
+            - name: SECONDARY_LLM_HARDWARE
+              value: {{ .Values.agent.secondaryLlm.hardware | quote }}
+            - name: PORT
+              value: {{ .Values.agent.port | quote }}
+            - name: EVAL_DASHBOARD_PORT
+              value: {{ .Values.agent.evalDashboard.port | quote }}
           envFrom:
             - configMapRef:
                 name: {{ include "deep-research-agent.fullname" . }}-config
@@ -73,10 +89,18 @@ spec:
           volumeMounts:
             - name: data
               mountPath: {{ .Values.agent.storage.mountPath }}
+            # Writable scratch for a read-only root filesystem: torch/python temp
+            # files and the dashboard's /tmp assets, and the agent's debug dumps
+            # (results/eval_debug, relative to /app).
+            - name: tmp
+              mountPath: /tmp
+            - name: results
+              mountPath: /app/results
           resources:
             {{- toYaml .Values.agent.resources | nindent 12 }}
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             capabilities:
               drop:
                 - ALL
@@ -88,3 +112,7 @@ spec:
           {{- else }}
           emptyDir: {}
           {{- end }}
+        - name: tmp
+          emptyDir: {}
+        - name: results
+          emptyDir: {}

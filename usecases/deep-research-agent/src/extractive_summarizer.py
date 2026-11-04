@@ -24,7 +24,16 @@ from clean_text import clean_scraped_text
 
 logger = logging.getLogger(__name__)
 
-nltk.download("punkt_tab", quiet=True)
+# The tokenizer is baked into the image (Dockerfile); only download when it is
+# missing (local runs). nltk.download writes a lock file next to the data, so
+# calling it unconditionally fails on a read-only root filesystem.
+try:
+    nltk.data.find("tokenizers/punkt_tab")
+except LookupError:
+    try:
+        nltk.download("punkt_tab", quiet=True)
+    except Exception as exc:  # offline / read-only — sentence splitting will fail later
+        logger.warning("Could not download NLTK punkt_tab tokenizer: %s", exc)
 
 _embedder_cache: dict[tuple[str, str], SentenceTransformer] = {}
 _embedder_lock = Lock()

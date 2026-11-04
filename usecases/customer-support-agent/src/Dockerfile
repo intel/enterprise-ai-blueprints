@@ -46,5 +46,9 @@ USER 10001
 # Expose ports: Streamlit UI and FastAPI server
 EXPOSE 8501 8502
 
+# FastAPI health endpoint (Streamlit runs alongside on 8501)
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD python3 -c "import urllib.request; urllib.request.urlopen('http://localhost:8502/api/v1/health')"
+
 # Run both services via startup script
 CMD ["./startup.sh"]

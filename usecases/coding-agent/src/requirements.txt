@@ -17,10 +17,16 @@ k8s-agent-sandbox==0.4.6
 # for api_key['BearerToken'], so requests go out as system:anonymous inside a pod.
 kubernetes>=35.0.0,<36
 
-# Ray — distributed parallel task execution
-# Version is pinned to match the KubeRay cluster image (rayproject/ray:2.9.0-py310).
-# Bump both this pin and kuberay_ray_image in config.agent-toolkit.yaml (AI Solutions) together.
-ray[default]==2.40.0
+# Ray — distributed parallel task execution (optional; only used when
+# RAY_ENABLED=true, otherwise the agent falls back to sequential execution).
+# Pinned to 2.56.x (~=) to patch CVE-2025-62593, CVE-2026-57516 and the other
+# 2025/2026 Ray advisories. When RAY_ENABLED=true the KubeRay cluster image must
+# match this client version: set kuberay_ray_image in config.agent-toolkit.yaml
+# to rayproject/ray:2.56.0-py312 (the agent-toolkit default is 2.40.0).
+ray[default]~=2.56.0
+# aiohttp is pulled in transitively by ray[default]; pin the patched release
+# (CVE-2025/CVE-2026 aiohttp advisories are fixed in 3.14.3; ray needs >=3.13.3).
+aiohttp>=3.14.3
 
 # Observability
 langfuse>=4.6.0

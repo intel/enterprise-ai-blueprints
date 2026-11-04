@@ -187,6 +187,7 @@ kubectl label namespace deep-research-agent istio.io/dataplane-mode=ambient \
 
 helm upgrade --install deep-research-agent ./helm-chart \
   --namespace deep-research-agent \
+  --set agent.image.tag=latest \
   --set agent.llm.baseUrl="http://litellm.litellm.svc.cluster.local:4000/v1" \
   --set-string agent.llm.apiKey="sk-your-litellm-key" \
   --set agent.llm.model="qwen2-5-coder-14b" \
@@ -245,7 +246,7 @@ tokenizer are baked into the image and `HF_HUB_OFFLINE=1` is set.
 | Key | Type | Default | Description |
 |---|---|---|---|
 | `agent.image.repository` | string | `deep-research-agent` | Image repository |
-| `agent.image.tag` | string | `latest` | Image tag |
+| `agent.image.tag` | string | `""` (chart `appVersion`) | Image tag; deploy.sh sets the tag it built (`latest` by default) |
 | `agent.image.pullPolicy` | string | `IfNotPresent` | Pull policy — keep for locally built images |
 | `agent.replicaCount` | int | `1` | **Keep at 1.** SQLite and the in-memory SSE queues are per-pod |
 

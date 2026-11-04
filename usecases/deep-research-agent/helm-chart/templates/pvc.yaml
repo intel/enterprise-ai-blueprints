@@ -3,6 +3,7 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: {{ include "deep-research-agent.fullname" . }}-data
+  namespace: {{ .Release.Namespace }}
   labels:
     {{- include "deep-research-agent.labels" . | nindent 4 }}
 spec:

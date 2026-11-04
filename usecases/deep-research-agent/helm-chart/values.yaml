@@ -8,7 +8,7 @@
 agent:
   image:
     repository: deep-research-agent
-    tag: latest
+    tag: ""             # empty = chart appVersion; deploy.sh sets the tag it built
     pullPolicy: IfNotPresent
 
   # Keep at 1: the SQLite database and the in-memory SSE progress queues are

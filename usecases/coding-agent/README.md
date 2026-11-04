@@ -84,7 +84,7 @@ use case. See the [AI Solutions setup guide](../../docs/ai-solutions-setup.md).
 | LLM model (tool-calling capable) | — | `llm_services_autodeploy_models` (default `["qwen2-5-coder-14b"]`) |
 | LiteLLM access from this namespace | — | add `coding-agent` to `litellm_allowed_namespaces` |
 | Langfuse (optional) | `langfuse` | installed by the inference layer |
-| KubeRay (optional) | `ray-system` | `kuberay_enabled` |
+| KubeRay (optional) | `ray-system` | `kuberay_enabled`, plus `kuberay_ray_image: rayproject/ray:2.56.0-py312` to match the agent's Ray client (~=2.56.0) |
 
 Verify all prerequisites are up:
 

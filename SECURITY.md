@@ -14,7 +14,8 @@ For more information on how Intel works to resolve security issues, see
 ## Accepted Scan Exceptions
 
 The following findings are reviewed and accepted for the released use cases
-(`coding-agent-maf`, `banking-assistant`). They are documented here so the
+(`coding-agent-maf`, `banking-assistant`, `coding-agent`, `customer-support-agent`,
+`deep-research-agent`). They are documented here so the
 rationale is traceable; they are not open action items.
 
 ### GPL / "restricted" license — base-image OS packages
@@ -40,9 +41,11 @@ rationale is traceable; they are not open action items.
   regardless of the Ray version.
 - **Assessment:** The Ray maintainers treat this as expected behavior for a
   framework designed to run inside a **trusted network boundary**. Ray is
-  optional here (used only when `RAY_ENABLED=true`) and the RayCluster runs
+  optional here (used only when `RAY_ENABLED=true`, or `TOOL_EXECUTOR=ray` for
+  customer-support-agent) and the RayCluster runs
   in-cluster with no public ingress on the dashboard (8265) or client (10001)
   ports.
 - **Decision:** Accepted, mitigated by network isolation. The Ray client is
-  pinned to `2.56.0`, which clears all other Ray advisories (CVE-2025-34351,
+  pinned to `~=2.56.0` (coding-agent-maf, coding-agent, customer-support-agent),
+  which clears all other Ray advisories (CVE-2025-34351,
   CVE-2025-62593, CVE-2025-1979, CVE-2026-57516, CVE-2026-27482, CVE-2026-41486).
