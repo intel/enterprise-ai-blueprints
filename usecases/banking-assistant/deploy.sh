@@ -4,11 +4,11 @@
 # =============================================================================
 # deploy.sh — One-click deployer for the Banking Assistant use case
 #
-# Deploys the Banking Assistant (agent + banking MCP sidecar) onto Intel® AI for
-# Enterprise Solutions (release-1.2, agent-toolkit layer) using Helm.
+# Deploys the Banking Assistant (agent + banking MCP sidecar) onto Intel® Agent
+# Toolkit (installed by Toolkit Manager release-1.2) using Helm.
 #
 # Prerequisites:
-#   • AI Solutions agent-toolkit is installed (see ../../docs/ai-solutions-setup.md)
+#   • Intel Agent Toolkit is installed with Toolkit Manager (see ../../docs/toolkit-manager-setup.md)
 #   • kubectl is configured and pointing at your cluster (env/<env>/kubeconfig.yaml)
 #   • helm is installed
 #   • The banking-assistant and banking-mcp container images are built and
@@ -18,7 +18,7 @@
 #   ./deploy.sh
 #
 # Environment variables (all optional — auto-discovered from the cluster or prompted):
-#   CLUSTER_URL         AI Solutions base_domain_name, e.g. solutions.ai (from eg-gateway)
+#   CLUSTER_URL         Toolkit Manager base_domain_name, e.g. solutions.ai (from eg-gateway)
 #   OPENAI_API_KEY      LiteLLM key (default: litellm-master-key; prefer a virtual key)
 #   MODEL_NAME          Model ID in LiteLLM (must support tool calling)
 #   OPENAI_BASE_URL     Override LiteLLM URL (default: in-cluster litellm.litellm:4000)
@@ -51,8 +51,8 @@ success() { echo -e "${GREEN}[OK]${NC}    $*"; }
 warn()    { echo -e "${YELLOW}[WARN]${NC}  $*"; }
 die()     { echo -e "${RED}[ERROR]${NC} $*" >&2; exit 1; }
 
-# shellcheck source=scripts/ai-solutions-lib.sh
-source "${SCRIPT_DIR}/../../scripts/ai-solutions-lib.sh"
+# shellcheck source=scripts/toolkit-manager-lib.sh
+source "${SCRIPT_DIR}/../../scripts/toolkit-manager-lib.sh"
 
 # ---------------------------------------------------------------------------
 # Dependency check
@@ -152,13 +152,13 @@ echo "  Banking Assistant — Deployment"
 echo "============================================================"
 echo ""
 
-aisol_discover_base_domain
-aisol_discover_litellm_key
-aisol_discover_langfuse
+tm_discover_base_domain
+tm_discover_litellm_key
+tm_discover_langfuse
 
 prompt_if_empty CLUSTER_URL \
-  "AI Solutions base_domain_name (e.g. solutions.ai)"
-[[ -n "${CLUSTER_URL}" ]] || die "CLUSTER_URL (AI Solutions base_domain_name) is required."
+  "Toolkit Manager base_domain_name (e.g. solutions.ai)"
+[[ -n "${CLUSTER_URL}" ]] || die "CLUSTER_URL (Toolkit Manager base_domain_name) is required."
 
 prompt_secret_if_empty OPENAI_API_KEY \
   "LiteLLM API key (OPENAI_API_KEY)"
@@ -168,7 +168,7 @@ prompt_if_empty MODEL_NAME \
 
 NAMESPACE="${NAMESPACE:-banking-assistant}"
 INGRESS_HOST="${INGRESS_HOST:-banking-assistant.${CLUSTER_URL}}"
-OPENAI_BASE_URL="${OPENAI_BASE_URL:-${AISOL_LITELLM_URL}}"
+OPENAI_BASE_URL="${OPENAI_BASE_URL:-${TM_LITELLM_URL}}"
 DEVUI_AUTH_TOKEN="${DEVUI_AUTH_TOKEN:-$(openssl rand -hex 24 2>/dev/null || echo "changeme")}"
 
 # Authenticated Redis URL from the agent-toolkit's credentials secret (the shared Redis
@@ -202,9 +202,9 @@ build_images
 # ---------------------------------------------------------------------------
 # Namespace (PSS restricted + Istio ambient) and LiteLLM access
 # ---------------------------------------------------------------------------
-# TLS is terminated at the AI Solutions gateway — no per-app certificate needed.
-aisol_prepare_namespace "${NAMESPACE}"
-aisol_check_litellm_access "${NAMESPACE}"
+# TLS is terminated at the platform gateway — no per-app certificate needed.
+tm_prepare_namespace "${NAMESPACE}"
+tm_check_litellm_access "${NAMESPACE}"
 
 # ---------------------------------------------------------------------------
 # Helm deploy
@@ -255,7 +255,7 @@ success "Banking Assistant deployed — namespace: ${NAMESPACE}"
 echo ""
 info "Access the Banking Assistant:"
 info "  https://${INGRESS_HOST}"
-aisol_print_gateway_hint "${INGRESS_HOST}"
+tm_print_gateway_hint "${INGRESS_HOST}"
 info "  (or locally: kubectl port-forward -n ${NAMESPACE} svc/banking-assistant 8090:8090 → http://localhost:8090)"
 info ""
 info "  DevUI login token (enter in the browser login prompt):"

@@ -1,7 +1,7 @@
 # Banking Assistant — Local Development Stack
 # Runs the agent + banking MCP server + Redis without Kubernetes.
 # Set LITELLM_URL and LITELLM_API_KEY to point at your running LiteLLM gateway —
-# on AI Solutions that is https://litellm.<base_domain_name>/v1 with a LiteLLM
+# on a Toolkit Manager stack that is https://litellm.<base_domain_name>/v1 with a LiteLLM
 # (virtual or master) key; the host must resolve to the eg-gateway IP and trust
 # its CA (env/<env>/logs/ai-solutions-ca.crt).
 #

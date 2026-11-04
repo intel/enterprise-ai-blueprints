@@ -5,7 +5,7 @@
 
 It stores short interaction summaries per customer as vectors in the cluster's
 redis-stack (RediSearch) and retrieves the most relevant ones to prime the agent's system
-prompt. Embeddings are produced by LiteLLM (AI Solutions inference layer), so no
+prompt. Embeddings are produced by LiteLLM (Intel Inference Toolkit), so no
 local embedding model is needed.
 
 Design goals:

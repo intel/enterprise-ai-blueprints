@@ -13,5 +13,5 @@ maintainers:
   - name: coding-agent
 
 # No sub-chart dependencies — Redis is deployed as a standalone StatefulSet
-# in the 'redis' namespace by the AI Solutions agent-toolkit layer (redis_stack).
+# in the 'redis' namespace by Intel Agent Toolkit (redis_stack).
 # Set redisUrl in values.yaml to point to it.

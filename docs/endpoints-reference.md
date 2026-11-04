@@ -1,7 +1,7 @@
-# Intel® AI for Enterprise Solutions — Endpoints Reference
+# Intel® Agent Toolkit — Endpoints Reference
 
-This document lists every service endpoint exposed by **Intel® AI for Enterprise
-Solutions** (agent-toolkit layer, release-1.2) that the blueprints consume, and
+This document lists every service endpoint exposed by **Intel® Agent Toolkit** and
+**Intel® Inference Toolkit** (installed by Toolkit Manager release-1.2) that the blueprints consume, and
 shows how to discover them after deployment.
 
 All use cases in this repo consume these endpoints. `<base>` below is the
@@ -14,7 +14,7 @@ the same value the deploy scripts call `CLUSTER_URL`.
 
 | Service | In-cluster URL | External URL (via `eg-gateway`) |
 |---|---|---|
-| **LiteLLM** (inference layer) | `http://litellm.litellm.svc.cluster.local:4000/v1` | `https://litellm.<base>/v1` |
+| **LiteLLM** (Inference Toolkit) | `http://litellm.litellm.svc.cluster.local:4000/v1` | `https://litellm.<base>/v1` |
 | **Langfuse (LLM Traces)** | `http://langfuse-web.langfuse.svc.cluster.local:3000` | `https://langfuse.<base>` |
 | **Redis** | `redis://default:<password>@redis-stack-server.redis.svc.cluster.local:6379` *(auth required)* | *(in-cluster only)* |
 | **Agent Sandbox Router** | `http://sandbox-router-svc.agent-sandbox-system.svc.cluster.local:8080` | *(in-cluster only)* |
@@ -87,7 +87,7 @@ kubectl get svc -A
 
 ## LiteLLM
 
-LiteLLM is the central LLM routing layer, installed by the **inference layer**.
+LiteLLM is the central LLM routing layer, installed by **Intel® Inference Toolkit**.
 All use cases talk to it using the OpenAI-compatible API. It already sends traces
 to Langfuse via callbacks, and the `content_safety` guardrail is on by default.
 
@@ -96,7 +96,7 @@ to Langfuse via callbacks, and the `content_safety` guardrail is on by default.
 > `litellm_allowed_namespaces` in `env/<env>/config.agent-toolkit.yaml` (then
 > re-run `./es_auto_installer.sh install agent-toolkit`) and be labelled
 > `istio.io/dataplane-mode=ambient` (deploy.sh does the label). See
-> [ai-solutions-setup.md](ai-solutions-setup.md#allow-the-blueprint-namespaces-to-reach-litellm).
+> [toolkit-manager-setup.md](toolkit-manager-setup.md#allow-the-blueprint-namespaces-to-reach-litellm).
 
 ### Endpoints
 
@@ -264,7 +264,7 @@ locally against a remote cluster.
 ## Langfuse (LLM Observability Traces)
 
 Langfuse captures every LLM call, token count, latency, and agent step. It is
-installed by the **inference layer**, and LiteLLM already sends its own traces to
+installed by **Intel® Inference Toolkit**, and LiteLLM already sends its own traces to
 it. It is **optional** for the blueprints — they deploy and run without it.
 
 ### URLs
@@ -446,7 +446,7 @@ In Kubernetes mode `deploy.sh` auto-discovers everything except `MODEL_NAME`
 when left empty:
 
 ```bash
-# Base domain (ai-solutions base_domain_name; auto-discovered from eg-gateway)
+# Base domain (Toolkit Manager base_domain_name; auto-discovered from eg-gateway)
 CLUSTER_URL=solutions.ai
 
 # LiteLLM  (external: https://litellm.<base>/v1)

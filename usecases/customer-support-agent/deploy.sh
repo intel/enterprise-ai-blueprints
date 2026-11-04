@@ -4,11 +4,11 @@
 # =============================================================================
 # deploy.sh — One-click deployer for the Customer Support Agent use case
 #
-# Deploys the Customer Support Agent (Streamlit UI + FastAPI) onto Intel® AI for
-# Enterprise Solutions (release-1.2, agent-toolkit layer) using Helm.
+# Deploys the Customer Support Agent (Streamlit UI + FastAPI) onto Intel® Agent
+# Toolkit (installed by Toolkit Manager release-1.2) using Helm.
 #
 # Prerequisites:
-#   • AI Solutions agent-toolkit is installed (see ../../docs/ai-solutions-setup.md)
+#   • Intel Agent Toolkit is installed with Toolkit Manager (see ../../docs/toolkit-manager-setup.md)
 #   • kubectl is configured and pointing at your cluster (env/<env>/kubeconfig.yaml)
 #   • helm is installed
 #
@@ -16,7 +16,7 @@
 #   ./deploy.sh
 #
 # Environment variables (all optional — auto-discovered from the cluster or prompted):
-#   CLUSTER_URL         AI Solutions base_domain_name, e.g. solutions.ai (from eg-gateway)
+#   CLUSTER_URL         Toolkit Manager base_domain_name, e.g. solutions.ai (from eg-gateway)
 #   LLM_API_KEY         LiteLLM key (alias OPENAI_API_KEY; default: litellm-master-key)
 #   LLM_MODEL           Chat model ID in LiteLLM (alias MODEL_NAME), e.g. qwen2-5-coder-14b
 #   LLM_BASE_URL        Override LiteLLM URL (alias OPENAI_BASE_URL; default: in-cluster)
@@ -51,8 +51,8 @@ success() { echo -e "${GREEN}[OK]${NC}    $*"; }
 warn()    { echo -e "${YELLOW}[WARN]${NC}  $*"; }
 die()     { echo -e "${RED}[ERROR]${NC} $*" >&2; exit 1; }
 
-# shellcheck source=scripts/ai-solutions-lib.sh
-source "${SCRIPT_DIR}/../../scripts/ai-solutions-lib.sh"
+# shellcheck source=scripts/toolkit-manager-lib.sh
+source "${SCRIPT_DIR}/../../scripts/toolkit-manager-lib.sh"
 
 # ---------------------------------------------------------------------------
 # Dependency check
@@ -147,14 +147,14 @@ LLM_BASE_URL="${LLM_BASE_URL:-${OPENAI_BASE_URL:-}}"
 LLM_API_KEY="${LLM_API_KEY:-${OPENAI_API_KEY:-}}"
 LLM_MODEL="${LLM_MODEL:-${MODEL_NAME:-}}"
 
-aisol_discover_base_domain
+tm_discover_base_domain
 OPENAI_API_KEY="${LLM_API_KEY}"
-aisol_discover_litellm_key
+tm_discover_litellm_key
 LLM_API_KEY="${OPENAI_API_KEY}"
 
 prompt_if_empty CLUSTER_URL \
-  "AI Solutions base_domain_name (e.g. solutions.ai)"
-[[ -n "${CLUSTER_URL}" ]] || die "CLUSTER_URL (AI Solutions base_domain_name) is required."
+  "Toolkit Manager base_domain_name (e.g. solutions.ai)"
+[[ -n "${CLUSTER_URL}" ]] || die "CLUSTER_URL (Toolkit Manager base_domain_name) is required."
 
 prompt_secret_if_empty LLM_API_KEY \
   "LiteLLM API key (LLM_API_KEY)"
@@ -164,7 +164,7 @@ prompt_if_empty LLM_MODEL \
 
 NAMESPACE="${NAMESPACE:-customer-support-agent}"
 INGRESS_HOST="${INGRESS_HOST:-customer-support-agent.${CLUSTER_URL}}"
-LLM_BASE_URL="${LLM_BASE_URL:-${AISOL_LITELLM_URL}}"
+LLM_BASE_URL="${LLM_BASE_URL:-${TM_LITELLM_URL}}"
 EMBEDDING_MODEL="${EMBEDDING_MODEL:-bge-base-en}"
 MEMORY_ENABLED="${MEMORY_ENABLED:-true}"
 
@@ -199,9 +199,9 @@ build_images
 # ---------------------------------------------------------------------------
 # Namespace (PSS restricted + Istio ambient) and LiteLLM access
 # ---------------------------------------------------------------------------
-# TLS is terminated at the AI Solutions gateway — no per-app certificate needed.
-aisol_prepare_namespace "${NAMESPACE}"
-aisol_check_litellm_access "${NAMESPACE}"
+# TLS is terminated at the platform gateway — no per-app certificate needed.
+tm_prepare_namespace "${NAMESPACE}"
+tm_check_litellm_access "${NAMESPACE}"
 
 # ---------------------------------------------------------------------------
 # Helm deploy
@@ -238,7 +238,7 @@ echo ""
 info "Access the Customer Support Agent:"
 info "  Streamlit UI: https://${INGRESS_HOST}/"
 info "  Chat UI/API:  https://${INGRESS_HOST}/api/v1/health"
-aisol_print_gateway_hint "${INGRESS_HOST}"
+tm_print_gateway_hint "${INGRESS_HOST}"
 info "  (or locally: kubectl port-forward -n ${NAMESPACE} svc/customer-support-agent 8501:8501 8502:8502)"
 warn "No user authentication: anyone who can reach ${INGRESS_HOST} can use the agent (demo data only)."
 echo ""

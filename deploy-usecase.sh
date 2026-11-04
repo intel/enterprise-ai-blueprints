@@ -2,8 +2,8 @@
 # Copyright (C) 2025-2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 # =============================================================================
-# deploy-usecase.sh — One-click deployer for blueprints on Intel® AI for
-# Enterprise Solutions (release-1.2, agent-toolkit layer)
+# deploy-usecase.sh — One-click deployer for blueprints on Intel® Agent Toolkit
+# (installed by Toolkit Manager, release-1.2)
 #
 # A thin dispatcher: it collects shared configuration once, then delegates to
 # each use case's own deploy.sh (Kubernetes) or docker-compose.yml (Docker).
@@ -20,7 +20,7 @@
 #   ./deploy-usecase.sh --all --mode kubernetes
 #
 # Environment variables (all optional — the use case's deploy.sh discovers or prompts):
-#   CLUSTER_URL       AI Solutions base_domain_name, e.g. solutions.ai
+#   CLUSTER_URL       Toolkit Manager base_domain_name, e.g. solutions.ai
 #   OPENAI_API_KEY    LiteLLM API key (default: litellm-master-key secret)
 #   OPENAI_BASE_URL   LLM endpoint URL (auto-discovered in K8s mode if unset)
 #   MODEL_NAME        Model ID registered in LiteLLM, e.g. qwen2-5-coder-14b
@@ -143,7 +143,7 @@ auto_discover_services() {
   }
 
   if [[ -z "${OPENAI_BASE_URL:-}" ]]; then
-    # AI Solutions installs LiteLLM as Service 'litellm' in namespace 'litellm'
+    # The Inference Toolkit installs LiteLLM as Service 'litellm' in namespace 'litellm'
     # (port 4000). Fall back to any litellm Service on port 4000 —
     # matching by name alone would pick a co-located cache/DB (e.g. litellm-redis).
     local match=""
@@ -253,7 +253,7 @@ deploy_all() {
 main() {
   echo ""
   echo "============================================================"
-  echo "  AI Solutions Blueprints — Use Case Deployer"
+  echo "  Agentic AI Blueprints — Use Case Deployer"
   echo "  Mode: ${MODE}"
   [[ "$DEPLOY_ALL" == true ]] && echo "  Target: ALL use cases" || echo "  Target: ${USECASE}"
   echo "============================================================"

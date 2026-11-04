@@ -6,14 +6,14 @@ Guidance for Claude Code (and other contributors) working in this repository.
 
 Reference **AI blueprints**: self-contained agent use cases. Each one has its own source,
 Dockerfile(s), Helm chart and `deploy.sh`. They run on top of
-**Intel® AI for Enterprise Solutions** [release-1.2](https://github.com/intel/enterprise-ai-solutions/tree/release-1.2),
-in its `agent-toolkit` layer ([enterprise-agent-toolkit release-2.0.0](https://github.com/intel/enterprise-agent-toolkit/tree/release-2.0.0)),
-which pulls in the inference layer (enterprise-inference release-1.1).
+**Intel® Agent Toolkit** ([enterprise-agent-toolkit release-2.0.0](https://github.com/intel/enterprise-agent-toolkit/tree/release-2.0.0)),
+installed and operated by **Toolkit Manager** [release-1.2](https://github.com/intel/enterprise-ai-solutions/tree/release-1.2) as its `agent-toolkit` layer,
+which pulls in **Intel® Inference Toolkit** (enterprise-inference release-1.1).
 
 The blueprints only *consume* the platform. They never install or modify platform components.
 
-**Roadmap:** blueprints will be packaged as a native AI Solutions layer
-(`configs/repos/repos.blueprints.yaml` in ai-solutions, plus `components.yaml`, `config.yaml` and
+**Roadmap:** blueprints will be installable directly through Toolkit Manager as their own layer
+(`configs/repos/repos.blueprints.yaml` in the Toolkit Manager repo, plus `components.yaml`, `config.yaml` and
 Ansible roles here; see `ROADMAP.md`). Until that lands, deployment is the standalone Helm + `deploy.sh` flow below.
 Don't add Ansible/layer files unless asked.
 
@@ -22,7 +22,7 @@ Don't add Ansible/layer files unless asked.
 ```
 deploy-usecase.sh            # thin dispatcher: shared config + auto-discovery, delegates to usecases/<name>/deploy.sh
 config.env                   # config template (copy to config.local.env, never commit that)
-scripts/ai-solutions-lib.sh  # shared platform helpers sourced by every usecases/*/deploy.sh
+scripts/toolkit-manager-lib.sh  # shared platform helpers sourced by every usecases/*/deploy.sh
 scripts/ensure-image-builder.sh  # buildkit/nerdctl bootstrap for local image builds
 usecases/<name>/
   deploy.sh                  # build image(s) → prepare namespace → helm upgrade --install
@@ -30,7 +30,7 @@ usecases/<name>/
   helm-chart/                # Deployment, Service, ConfigMap, Secret, HTTPRoute, SecurityPolicy (+RBAC/PVC)
   src/                       # agent code (Microsoft Agent Framework), Dockerfile(s), requirements
   examples/                  # client scripts
-docs/                        # ai-solutions-setup, endpoints-reference, observability-langfuse, adding-new-usecases
+docs/                        # toolkit-manager-setup, endpoints-reference, observability-langfuse, adding-new-usecases
 ```
 
 Current use cases (directory = namespace; host in parentheses):
@@ -43,7 +43,7 @@ Current use cases (directory = namespace; host in parentheses):
 `customer-support-agent` and `deep-research-agent` read `LLM_BASE_URL`/`LLM_API_KEY`/`LLM_MODEL`. Their
 deploy.sh maps the dispatcher's `OPENAI_BASE_URL`/`OPENAI_API_KEY`/`MODEL_NAME` onto those.
 
-## Platform contract (AI Solutions 1.2 / agent-toolkit 2.0.0)
+## Platform contract (Toolkit Manager 1.2 / Intel® Agent Toolkit 2.0.0)
 
 | Service | In-cluster endpoint | Credentials |
 |---|---|---|
@@ -59,12 +59,12 @@ Rules every blueprint must follow:
   - The gateway-wide `SecurityPolicy gateway-auth` requires a LiteLLM key on every route. Charts ship an empty route-level SecurityPolicy (`httpRoute.bypassGatewayAuth: true`) because DevUI has its own `DEVUI_AUTH_TOKEN`.
   - Don't use the reserved hosts `inference.`, `keycloak.` or `grafana.`.
 - **Mesh:** Istio ambient with STRICT mTLS.
-  - The app namespace must carry `istio.io/dataplane-mode=ambient`; `aisol_prepare_namespace` sets it.
-  - To call LiteLLM, the namespace must also be in `litellm_allowed_namespaces` (`env/<env>/config.agent-toolkit.yaml`, then `./es_auto_installer.sh install agent-toolkit`). `aisol_check_litellm_access` warns, and `PATCH_LITELLM_AUTHZ=true` patches the policy as a temporary fix.
+  - The app namespace must carry `istio.io/dataplane-mode=ambient`; `tm_prepare_namespace` sets it.
+  - To call LiteLLM, the namespace must also be in `litellm_allowed_namespaces` (`env/<env>/config.agent-toolkit.yaml`, then `./es_auto_installer.sh install agent-toolkit`). `tm_check_litellm_access` warns, and `PATCH_LITELLM_AUTHZ=true` patches the policy as a temporary fix.
 - **Pod Security:** namespaces are labelled `restricted`.
   - Pods: `runAsNonRoot`, UID/GID 10001 (numeric `USER` in the Dockerfile), `fsGroup`, `seccompProfile: RuntimeDefault`.
   - Containers: `allowPrivilegeEscalation: false`, `capabilities.drop: [ALL]`.
-- **Scheduling:** no hard node affinity. AI Solutions labels nodes `workload-class=platform|inference`, on multi-node clusters only.
+- **Scheduling:** no hard node affinity. The stack Toolkit Manager installs labels nodes `workload-class=platform|inference`, on multi-node clusters only.
 - **Sandboxes:** sandbox pods have no in-cluster egress (NetworkPolicy `eat-sandbox-pool-egress`). Code running in a sandbox cannot call LiteLLM or Redis.
 - **Auth mode:** the agent-toolkit default is `auth_provider: litellm`, so Keycloak is not deployed. Don't add Keycloak dependencies.
 
@@ -92,12 +92,12 @@ Validate the platform with `./es_auto_installer.sh validate agent-toolkit`.
 
 - `deploy-usecase.sh` holds **no per-use-case code**. Any `usecases/<name>/` with an executable `deploy.sh` is deployable.
 - Each `deploy.sh` does the following, in order:
-  1. sources `scripts/ai-solutions-lib.sh`;
-  2. runs discovery (`aisol_discover_*`), then prompts only for values that are still empty;
+  1. sources `scripts/toolkit-manager-lib.sh`;
+  2. runs discovery (`tm_discover_*`), then prompts only for values that are still empty;
   3. builds images into containerd `k8s.io` via nerdctl (`SKIP_BUILD=true` to skip);
-  4. runs `aisol_prepare_namespace` and `aisol_check_litellm_access`;
+  4. runs `tm_prepare_namespace` and `tm_check_litellm_access`;
   5. calls `helm upgrade --install`, wiring everything with `--set`.
-- Put new platform lookups in `scripts/ai-solutions-lib.sh`, not in individual `deploy.sh` files. Lookups stay best-effort: fill only empty vars, and no-op when the resource is missing.
+- Put new platform lookups in `scripts/toolkit-manager-lib.sh`, not in individual `deploy.sh` files. Lookups stay best-effort: fill only empty vars, and no-op when the resource is missing.
 - Chart values: secrets go into `<fullname>-secret` and plain config into `<fullname>-config`, both consumed with `envFrom`. Keep hardening `securityContext` blocks as inline literals so static scanners (checkov) can verify them.
 - Shell: `set -euo pipefail`, the `info`/`success`/`warn`/`die` helpers, and shellcheck-clean code.
 - Platform services are referenced by in-cluster DNS. Don't hard-code `base_domain_name`; discover it from `eg-gateway`, or read it from `CLUSTER_URL`.

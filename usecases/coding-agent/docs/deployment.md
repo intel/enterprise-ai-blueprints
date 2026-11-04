@@ -1,8 +1,8 @@
 # Coding Agent (LangGraph) -- Deployment Guide
 
 This guide covers deploying the LangGraph Coding Agent on
-[Intel® AI for Enterprise Solutions](https://github.com/intel/enterprise-ai-solutions/tree/release-1.2)
-(release-1.2, agent-toolkit layer) with Helm, and running it locally with Docker
+[Intel® Agent Toolkit](https://github.com/intel/enterprise-agent-toolkit/tree/release-2.0.0) (installed by
+[Toolkit Manager](https://github.com/intel/enterprise-ai-solutions/tree/release-1.2) release-1.2) with Helm, and running it locally with Docker
 Compose.
 
 | Item | Value |
@@ -18,17 +18,17 @@ Compose.
 
 ### Platform
 
-Deploy AI Solutions (agent-toolkit) first — see the
-[AI Solutions setup guide](../../../docs/ai-solutions-setup.md).
+Install Intel® Agent Toolkit with Toolkit Manager first — see the
+[Toolkit Manager setup guide](../../../docs/toolkit-manager-setup.md).
 
 | Component | Namespace | Switch (`env/<env>/config.agent-toolkit.yaml`) |
 |---|---|---|
 | Kubernetes, Istio, Envoy Gateway (`eg-gateway`) | — / `envoy-gateway-system` | installed by `./es_auto_installer.sh install agent-toolkit` |
-| LiteLLM | `litellm` | always installed by the inference layer |
+| LiteLLM | `litellm` | always installed by Intel® Inference Toolkit |
 | Agent Sandbox controller + router | `agent-sandbox-system` | `agent_sandbox_enabled` |
 | Tool-calling LLM model | — | `llm_services_autodeploy_models` (default `["qwen2-5-coder-14b"]`) |
 | LiteLLM access | — | add `coding-agent` to `litellm_allowed_namespaces` |
-| Langfuse (optional) | `langfuse` | inference layer |
+| Langfuse (optional) | `langfuse` | Intel® Inference Toolkit |
 | KubeRay (optional) | `ray-system` | `kuberay_enabled` |
 
 Example `config.agent-toolkit.yaml` excerpt, then
@@ -56,7 +56,7 @@ kubectl get sandboxtemplate,sandboxwarmpool -n agent-sandbox-system
 
 | Mode | Requires |
 |---|---|
-| Kubernetes | `kubectl` (AI Solutions kubeconfig `env/<env>/kubeconfig.yaml`), `helm` 3, `nerdctl` (or `docker`) to build the image |
+| Kubernetes | `kubectl` (Toolkit Manager kubeconfig `env/<env>/kubeconfig.yaml`), `helm` 3, `nerdctl` (or `docker`) to build the image |
 | Docker | Docker Engine 24+ with Compose v2, a reachable LiteLLM endpoint + key, and a port-forwarded sandbox router |
 
 ## Kubernetes Deployment

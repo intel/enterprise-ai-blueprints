@@ -4,8 +4,8 @@ Thank you for your interest in contributing to **Agentic AI Blueprints**. This
 repository is a catalog of deployable AI use cases ("blueprints"). Contributions
 are welcome, including:
 
-- **New blueprints** — a use case can target Intel® AI for Enterprise Solutions
-  (agent-toolkit layer) or any other
+- **New blueprints** — a use case can target Intel® Agent Toolkit
+  (installed by Toolkit Manager) or any other
   purpose (inference, RAG, tooling demos, integrations).
 - **Improvements** — bug fixes, hardening, performance, or docs for an existing
   blueprint.
@@ -44,9 +44,9 @@ enforces this.
    git checkout -b my-use-case main
    ```
 3. Make sure you can deploy at least one existing blueprint first — this confirms
-   your **AI Solutions (agent-toolkit)** cluster is reachable (see the repository
+   your **Intel® Agent Toolkit** cluster is reachable (see the repository
    [Prerequisites](README.md#prerequisites) and
-   [docs/ai-solutions-setup.md](docs/ai-solutions-setup.md)).
+   [docs/toolkit-manager-setup.md](docs/toolkit-manager-setup.md)).
 
 ## Adding a new use case
 
@@ -72,7 +72,7 @@ usecases/<name>/
 When you add a use case, also:
 
 1. **Pick a category** for the [Use Case Catalog](README.md#use-case-catalog)
-   (e.g. `AI Solutions · Agent Toolkit`, `AI Solutions · Inference`, `RAG`). Reuse an existing category where
+   (e.g. `Intel® Agent Toolkit`, `Intel® Inference Toolkit`, `RAG`). Reuse an existing category where
    it fits; propose a new one in your PR description if none does.
 2. **Add a row** to the catalog table in [README.md](README.md).
 3. **Read all configuration from environment variables** — no hardcoded secrets,

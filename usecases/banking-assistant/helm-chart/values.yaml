@@ -23,7 +23,7 @@ agent:
   # LLM configuration – openaiApiKey is required
   openaiApiKey: ""            # REQUIRED – set via --set or a separate secret values file
   devuiAuthToken: ""          # REQUIRED – auth token for DevUI when bound to non-loopback host
-  openaiBaseUrl: "http://litellm.litellm.svc.cluster.local:4000/v1"   # AI Solutions LiteLLM (inference layer)
+  openaiBaseUrl: "http://litellm.litellm.svc.cluster.local:4000/v1"   # Intel Inference Toolkit LiteLLM
   # Langfuse observability (optional)
   langfusePublicKey: ""
   langfuseSecretKey: ""
@@ -55,7 +55,7 @@ agent:
       cpu: "1"
       memory: 1Gi
 
-  # Node affinity. AI Solutions multi-node clusters label nodes
+  # Node affinity. Multi-node clusters installed by Toolkit Manager label nodes
   # workload-class=platform|inference.
   # Empty = schedule anywhere. Example soft preference:
   #   affinity:
@@ -94,7 +94,7 @@ mcp:
   # directly in templates/deployment.yaml (so static IaC scanners can verify it).
 
 # ---------------------------------------------------------------------------
-# Redis URL — shared Redis from the agent-toolkit layer (namespace 'redis').
+# Redis URL — shared Redis from Intel Agent Toolkit (namespace 'redis').
 # It requires auth: deploy.sh reads the full URL from the
 # redis-stack-server-credentials secret (key REDIS_URL).
 # ---------------------------------------------------------------------------
@@ -102,7 +102,7 @@ redisUrl: "redis://redis-stack-server.redis.svc.cluster.local:6379"
 
 # ---------------------------------------------------------------------------
 # HTTPRoute (Envoy Gateway / Gateway API)
-# AI Solutions exposes services through the shared Envoy Gateway 'eg-gateway'
+# The platform exposes services through the shared Envoy Gateway 'eg-gateway'
 # (namespace envoy-gateway-system); TLS is terminated there with the wildcard
 # *.<base_domain_name> certificate, so the chart needs no TLS secret.
 # ---------------------------------------------------------------------------

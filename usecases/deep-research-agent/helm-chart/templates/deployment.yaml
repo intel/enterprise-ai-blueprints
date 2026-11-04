@@ -20,7 +20,7 @@ spec:
         checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
     spec:
       serviceAccountName: {{ include "deep-research-agent.serviceAccountName" . }}
-      # Pod Security Standard 'restricted' (AI Solutions enforces PSS). UID/GID
+      # Pod Security Standard 'restricted' (the platform enforces PSS). UID/GID
       # 10001 matches the numeric user baked into the image (Dockerfile); fsGroup
       # makes the data PVC writable for the SQLite DB.
       securityContext:

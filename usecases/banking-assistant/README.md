@@ -1,8 +1,8 @@
 # Banking Assistant
 
 A conversational banking assistant built on
-[Intel® AI for Enterprise Solutions](https://github.com/intel/enterprise-ai-solutions/tree/release-1.2)
-(agent-toolkit layer). It routes natural-language requests ("what's my balance?",
+[Intel® Agent Toolkit](https://github.com/intel/enterprise-agent-toolkit/tree/release-2.0.0), installed by
+[Toolkit Manager](https://github.com/intel/enterprise-ai-solutions/tree/release-1.2). It routes natural-language requests ("what's my balance?",
 "transfer $200 to savings", "when is my loan payment due?") to a model served
 through LiteLLM, and uses a **Model
 Context Protocol (MCP)** server for all factual account data and operations.
@@ -68,10 +68,10 @@ Demo users: `U1001` (Ada Lovelace), `U1002` (Alan Turing), `U1003` (Grace Hopper
 
 ## 2. Prerequisites
 
-- A running **Intel® AI for Enterprise Solutions (agent-toolkit layer)** with
+- A running **Intel® Agent Toolkit** (installed with Toolkit Manager) with
   **LiteLLM** reachable and a **tool-calling-capable model** registered (e.g.
   `qwen2-5-coder-14b`, the `llm_services_autodeploy_models` default). See the
-  [AI Solutions setup guide](../../docs/ai-solutions-setup.md).
+  [Toolkit Manager setup guide](../../docs/toolkit-manager-setup.md).
 - The `banking-assistant` namespace listed in `litellm_allowed_namespaces` in
   `env/<env>/config.agent-toolkit.yaml` (then re-run
   `./es_auto_installer.sh install agent-toolkit`). `deploy.sh` labels the

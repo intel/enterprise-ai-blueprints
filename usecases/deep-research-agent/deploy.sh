@@ -4,12 +4,12 @@
 # =============================================================================
 # deploy.sh — One-click deployer for the Deep Research Agent use case
 #
-# Deploys the Deep Research Agent onto Intel® AI for Enterprise Solutions
-# (release-1.2, agent-toolkit layer) using Helm. This use case deploys NO
-# models: it consumes LiteLLM (inference layer) via URL + API key.
+# Deploys the Deep Research Agent onto Intel® Agent Toolkit
+# (installed by Toolkit Manager release-1.2) using Helm. This use case deploys NO
+# models: it consumes LiteLLM (Intel® Inference Toolkit) via URL + API key.
 #
 # Prerequisites:
-#   • AI Solutions agent-toolkit is installed (see ../../docs/ai-solutions-setup.md)
+#   • Intel Agent Toolkit is installed with Toolkit Manager (see ../../docs/toolkit-manager-setup.md)
 #   • kubectl is configured and pointing at your cluster (env/<env>/kubeconfig.yaml)
 #   • helm is installed
 #   • A Tavily search API key (https://tavily.com/)
@@ -18,7 +18,7 @@
 #   ./deploy.sh
 #
 # Environment variables (all optional — auto-discovered from the cluster or prompted):
-#   CLUSTER_URL         AI Solutions base_domain_name, e.g. solutions.ai (from eg-gateway)
+#   CLUSTER_URL         Toolkit Manager base_domain_name, e.g. solutions.ai (from eg-gateway)
 #   LLM_API_KEY         LiteLLM key (alias OPENAI_API_KEY; default: litellm-master-key)
 #   LLM_MODEL           Model ID in LiteLLM (alias MODEL_NAME) — MUST support tool calling
 #   LLM_BASE_URL        Override LiteLLM URL (alias OPENAI_BASE_URL; default: in-cluster)
@@ -53,8 +53,8 @@ success() { echo -e "${GREEN}[OK]${NC}    $*"; }
 warn()    { echo -e "${YELLOW}[WARN]${NC}  $*"; }
 die()     { echo -e "${RED}[ERROR]${NC} $*" >&2; exit 1; }
 
-# shellcheck source=scripts/ai-solutions-lib.sh
-source "${SCRIPT_DIR}/../../scripts/ai-solutions-lib.sh"
+# shellcheck source=scripts/toolkit-manager-lib.sh
+source "${SCRIPT_DIR}/../../scripts/toolkit-manager-lib.sh"
 
 # ---------------------------------------------------------------------------
 # Dependency check
@@ -149,14 +149,14 @@ LLM_BASE_URL="${LLM_BASE_URL:-${OPENAI_BASE_URL:-}}"
 LLM_API_KEY="${LLM_API_KEY:-${OPENAI_API_KEY:-}}"
 LLM_MODEL="${LLM_MODEL:-${MODEL_NAME:-}}"
 
-aisol_discover_base_domain
+tm_discover_base_domain
 OPENAI_API_KEY="${LLM_API_KEY}"
-aisol_discover_litellm_key
+tm_discover_litellm_key
 LLM_API_KEY="${OPENAI_API_KEY}"
 
 prompt_if_empty CLUSTER_URL \
-  "AI Solutions base_domain_name (e.g. solutions.ai)"
-[[ -n "${CLUSTER_URL}" ]] || die "CLUSTER_URL (AI Solutions base_domain_name) is required."
+  "Toolkit Manager base_domain_name (e.g. solutions.ai)"
+[[ -n "${CLUSTER_URL}" ]] || die "CLUSTER_URL (Toolkit Manager base_domain_name) is required."
 
 prompt_secret_if_empty LLM_API_KEY \
   "LiteLLM API key (LLM_API_KEY)"
@@ -174,7 +174,7 @@ prompt_secret_if_empty TAVILY_API_KEY \
 NAMESPACE="${NAMESPACE:-deep-research-agent}"
 INGRESS_HOST="${INGRESS_HOST:-deep-research-agent.${CLUSTER_URL}}"
 DASHBOARD_HOST="${DASHBOARD_HOST:-deep-research-agent-dashboard.${CLUSTER_URL}}"
-LLM_BASE_URL="${LLM_BASE_URL:-${AISOL_LITELLM_URL}}"
+LLM_BASE_URL="${LLM_BASE_URL:-${TM_LITELLM_URL}}"
 EVAL_DASHBOARD_ENABLED="${EVAL_DASHBOARD_ENABLED:-false}"
 
 echo ""
@@ -197,9 +197,9 @@ build_images
 # ---------------------------------------------------------------------------
 # Namespace (PSS restricted + Istio ambient) and LiteLLM access
 # ---------------------------------------------------------------------------
-# TLS is terminated at the AI Solutions gateway — no per-app certificate needed.
-aisol_prepare_namespace "${NAMESPACE}"
-aisol_check_litellm_access "${NAMESPACE}"
+# TLS is terminated at the platform gateway — no per-app certificate needed.
+tm_prepare_namespace "${NAMESPACE}"
+tm_check_litellm_access "${NAMESPACE}"
 
 # ---------------------------------------------------------------------------
 # Helm deploy
@@ -244,6 +244,6 @@ echo ""
 info "Access the Deep Research Agent:"
 info "  https://${INGRESS_HOST}   (health: /health)"
 [[ "${EVAL_DASHBOARD_ENABLED}" == "true" ]] && info "  https://${DASHBOARD_HOST}   (eval metrics dashboard)"
-aisol_print_gateway_hint "${INGRESS_HOST}"
+tm_print_gateway_hint "${INGRESS_HOST}"
 info "  (or locally: kubectl port-forward -n ${NAMESPACE} svc/deep-research-agent 8081:8081 → http://localhost:8081)"
 echo ""

@@ -450,7 +450,7 @@ All configuration is centralized in `src/config.py` and read from environment va
 | `LLM_MODEL` | `str` | `qwen2-5-coder-14b` | Chat model registered in LiteLLM |
 | `DB_PATH` | `str` | `src/techgadgets.db` (image/chart: `/app/data/techgadgets.db`) | Path to SQLite database file |
 | `MEMORY_ENABLED` | `bool` | `true` | Enable long-term memory |
-| `REDIS_URL` | `str` | `redis://redis-stack-server.redis.svc.cluster.local:6379/0` | RediSearch URL (must include credentials on AI Solutions) |
+| `REDIS_URL` | `str` | `redis://redis-stack-server.redis.svc.cluster.local:6379/0` | RediSearch URL (must include credentials on Intel® Agent Toolkit) |
 | `MEMORY_INDEX` | `str` | `csa_mem_idx` | RediSearch index name |
 | `MEMORY_TOP_K` | `int` | `4` | Memories recalled per query |
 | `EMBEDDING_MODEL` | `str` | `bge-base-en` | Embedding model served by LiteLLM |

@@ -1,5 +1,5 @@
 {{- if .Values.httpRoute.enabled }}
-# Exposes the DevUI through the AI Solutions Envoy Gateway (Gateway API).
+# Exposes the DevUI through the platform's Envoy Gateway (Gateway API).
 # TLS is terminated at the gateway's https listener (*.<base_domain_name>).
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute

@@ -1,8 +1,8 @@
 # Observability — Tracing with Langfuse
 
 Every blueprint can export **traces** (each LLM call, tool call, token count,
-latency, and agent step) to **Langfuse**, the observability service that Intel®
-AI for Enterprise Solutions installs (inference layer). This guide shows where the
+latency, and agent step) to **Langfuse**, the observability service that
+Intel® Inference Toolkit provides (installed by Toolkit Manager). This guide shows where the
 project keys come from, how to create your own project, and how to point a use
 case at it — including how the OpenTelemetry (OTEL) export works.
 
@@ -39,7 +39,7 @@ endpoint from `LANGFUSE_HOST` and authenticates with the project keys.
 
 ## Prerequisites
 
-Langfuse is deployed by the AI Solutions inference layer in the `langfuse`
+Langfuse is deployed by Intel® Inference Toolkit in the `langfuse`
 namespace (LiteLLM already sends its own traces there via callbacks). Confirm
 it's up:
 

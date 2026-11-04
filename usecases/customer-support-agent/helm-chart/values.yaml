@@ -11,7 +11,7 @@ agent:
   replicaCount: 1
 
   # LLM configuration
-  llmBaseUrl: "http://litellm.litellm.svc.cluster.local:4000/v1"   # AI Solutions LiteLLM (inference layer)
+  llmBaseUrl: "http://litellm.litellm.svc.cluster.local:4000/v1"   # Intel Inference Toolkit LiteLLM
   llmApiKey: ""               # REQUIRED – LiteLLM key (deploy.sh discovers the master key)
   llmModel: "qwen2-5-coder-14b"
 
@@ -24,7 +24,7 @@ agent:
     redisUrl: "redis://redis-stack-server.redis.svc.cluster.local:6379/0"
     index: "csa_mem_idx"
     topK: 4
-    # AI Solutions catalog name for BAAI/bge-base-en-v1.5 — add "bge-base-en" to
+    # Inference Toolkit catalog name for BAAI/bge-base-en-v1.5 — add "bge-base-en" to
     # llm_services_autodeploy_models in config.agent-toolkit.yaml to serve it.
     embeddingModel: "bge-base-en"
     embeddingDims: 768
@@ -66,7 +66,7 @@ service:
 
 # ---------------------------------------------------------------------------
 # HTTPRoute (Envoy Gateway / Gateway API)
-# AI Solutions exposes services through the shared Envoy Gateway 'eg-gateway'
+# The platform exposes services through the shared Envoy Gateway 'eg-gateway'
 # (namespace envoy-gateway-system); TLS is terminated there with the wildcard
 # *.<base_domain_name> certificate, so the chart needs no TLS secret.
 # Routing: /api and /v1 → FastAPI (apiPort), everything else → Streamlit UI.

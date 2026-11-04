@@ -25,13 +25,13 @@ agent:
   # LLM configuration – openaiApiKey is required
   openaiApiKey: ""            # REQUIRED – set via --set or a separate secret values file
   devuiAuthToken: ""          # REQUIRED – auth token for DevUI when bound to non-loopback host
-  openaiBaseUrl: "http://litellm.litellm.svc.cluster.local:4000/v1"   # AI Solutions LiteLLM (inference layer)
+  openaiBaseUrl: "http://litellm.litellm.svc.cluster.local:4000/v1"   # Intel Inference Toolkit LiteLLM
   # Langfuse observability (optional)
   langfusePublicKey: ""
   langfuseSecretKey: ""
   langfuseHost: ""              # -> LANGFUSE_HOST, e.g. http://langfuse-web.langfuse.svc.cluster.local:3000
   langfuseEnableSensitiveData: "true"
-  # modelName must be a model ID registered in LiteLLM (AI Solutions default:
+  # modelName must be a model ID registered in LiteLLM (Inference Toolkit default:
   # qwen2-5-coder-14b, set by llm_services_autodeploy_models in config.agent-toolkit.yaml).
   # deploy.sh prompts for it; for manual Helm installs:
   #   helm install coding-agent ./helm-chart --set agent.modelName="qwen2-5-coder-14b" ...
@@ -40,7 +40,7 @@ agent:
   # Proxy bypass list – cluster-internal traffic must not go through the corporate proxy
   noProxy: "localhost,127.0.0.1,intel.com,.svc,.svc.cluster.local,.default.svc.cluster.local,.agent-sandbox-system.svc.cluster.local,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
 
-  # Agent Sandbox (agent-toolkit layer, fixed namespace 'agent-sandbox-system').
+  # Agent Sandbox (Intel Agent Toolkit, fixed namespace 'agent-sandbox-system').
   # Verify: kubectl get sandboxtemplate,sandboxwarmpool -n agent-sandbox-system
   sandboxNamespace: "agent-sandbox-system"
   sandboxTemplate: "python-sandbox-template"
@@ -69,7 +69,7 @@ agent:
       cpu: "1"
       memory: 1Gi
 
-  # Node affinity. AI Solutions multi-node clusters label nodes
+  # Node affinity. Multi-node clusters installed by Toolkit Manager label nodes
   # workload-class=platform|inference.
   # Empty = schedule anywhere. Example soft preference:
   #   affinity:
@@ -84,7 +84,7 @@ agent:
   affinity: {}
 
 # ---------------------------------------------------------------------------
-# Redis URL — shared Redis from the agent-toolkit layer (namespace 'redis').
+# Redis URL — shared Redis from Intel Agent Toolkit (namespace 'redis').
 # It requires auth: deploy.sh reads the full URL from the
 # redis-stack-server-credentials secret (key REDIS_URL).
 # ---------------------------------------------------------------------------
@@ -92,7 +92,7 @@ redisUrl: "redis://redis-stack-server.redis.svc.cluster.local:6379"
 
 # ---------------------------------------------------------------------------
 # HTTPRoute (Envoy Gateway / Gateway API)
-# AI Solutions exposes services through the shared Envoy Gateway 'eg-gateway'
+# The platform exposes services through the shared Envoy Gateway 'eg-gateway'
 # (namespace envoy-gateway-system); TLS is terminated there with the wildcard
 # *.<base_domain_name> certificate, so the chart needs no TLS secret.
 # ---------------------------------------------------------------------------

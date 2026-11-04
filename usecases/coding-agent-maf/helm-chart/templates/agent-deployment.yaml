@@ -18,7 +18,7 @@ spec:
         {{- include "coding-agent.selectorLabels" . | nindent 8 }}
     spec:
       serviceAccountName: {{ if .Values.serviceAccount.create }}{{ include "coding-agent.fullname" . }}{{ else }}default{{ end }}
-      # Pod Security Standard 'restricted' (AI Solutions enforces PSS). UID/GID
+      # Pod Security Standard 'restricted' (the platform enforces PSS). UID/GID
       # 10001 matches the numeric user baked into the image (Dockerfile).
       securityContext:
         runAsNonRoot: true

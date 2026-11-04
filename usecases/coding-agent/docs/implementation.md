@@ -49,7 +49,7 @@ LangGraph Coding Agent (`src/agent.py`, `src/tools.py`, `src/main.py`).
 ## LLM Integration
 
 `create_agent()` builds a `ChatOpenAI` client from `OPENAI_BASE_URL`,
-`OPENAI_API_KEY` and `MODEL_NAME` with `temperature=0`. On AI Solutions this is
+`OPENAI_API_KEY` and `MODEL_NAME` with `temperature=0`. On Intel® Agent Toolkit this is
 LiteLLM at `http://litellm.litellm.svc.cluster.local:4000/v1`; the model
 (default `qwen2-5-coder-14b`) must be registered in LiteLLM and support native
 tool/function calling, because the ReAct loop relies on structured tool calls.

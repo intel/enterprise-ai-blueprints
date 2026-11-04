@@ -2,7 +2,8 @@
 # Docker Compose — Local development stack for the Deep Research Agent
 #
 # No models are started here. Point it at any OpenAI-compatible endpoint — on
-# AI Solutions that is LiteLLM at https://litellm.<base_domain_name>/v1 with a
+# a Toolkit Manager stack that is Intel Inference Toolkit LiteLLM at
+# https://litellm.<base_domain_name>/v1 with a
 # LiteLLM key (the host must resolve to the eg-gateway IP and trust its CA,
 # env/<env>/logs/ai-solutions-ca.crt) — and set TAVILY_API_KEY for web search.
 #

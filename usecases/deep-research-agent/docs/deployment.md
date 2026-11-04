@@ -7,9 +7,9 @@ For what the agent actually does internally, see
 [implementation.md](implementation.md).
 
 The target platform is
-[Intel® AI for Enterprise Solutions](https://github.com/intel/enterprise-ai-solutions/tree/release-1.2)
-(release-1.2) with its agent-toolkit layer — see the
-[AI Solutions setup guide](../../../docs/ai-solutions-setup.md).
+[Intel® Agent Toolkit](https://github.com/intel/enterprise-agent-toolkit/tree/release-2.0.0), installed by
+[Toolkit Manager](https://github.com/intel/enterprise-ai-solutions/tree/release-1.2) (release-1.2) — see the
+[Toolkit Manager setup guide](../../../docs/toolkit-manager-setup.md).
 
 > **No models are deployed by this use case.** The LLM is reached over HTTP from
 > LiteLLM via `LLM_BASE_URL` + `LLM_API_KEY` + `LLM_MODEL`. Nothing in this chart
@@ -24,7 +24,7 @@ The target platform is
 | Component | Namespace | Switch (`env/<env>/config.agent-toolkit.yaml`) |
 |---|---|---|
 | Kubernetes, Istio, Envoy Gateway (`eg-gateway`) | — / `envoy-gateway-system` | installed by `./es_auto_installer.sh install agent-toolkit` |
-| LiteLLM | `litellm` | always installed by the inference layer |
+| LiteLLM | `litellm` | always installed by Intel® Inference Toolkit |
 | Tool-calling LLM model | — | `llm_services_autodeploy_models` (default `["qwen2-5-coder-14b"]`) |
 | LiteLLM access from this namespace | — | add `deep-research-agent` to `litellm_allowed_namespaces`, then `./es_auto_installer.sh install agent-toolkit` |
 
@@ -41,7 +41,7 @@ The target platform is
 
 ### Kubernetes-specific
 
-- `kubectl` with the AI Solutions kubeconfig (`env/<env>/kubeconfig.yaml`), and
+- `kubectl` with the Toolkit Manager kubeconfig (`env/<env>/kubeconfig.yaml`), and
   `helm` 3.x.
 - A default StorageClass, or set `agent.storage.storageClassName` — the chart
   requests a `ReadWriteOnce` PVC (5 Gi by default).
@@ -212,7 +212,7 @@ helm template deep-research-agent ./helm-chart \
 ### Accessing it
 
 Map the hostname to the gateway and trust the CA (see
-[ai-solutions-setup.md](../../../docs/ai-solutions-setup.md#3-reach-the-gateway-hostnames--ca)):
+[toolkit-manager-setup.md](../../../docs/toolkit-manager-setup.md#3-reach-the-gateway-hostnames--ca)):
 
 ```bash
 kubectl get svc -n envoy-gateway-system \

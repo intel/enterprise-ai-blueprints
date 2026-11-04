@@ -1,18 +1,18 @@
-# Intel® AI for Enterprise Solutions — Setup & Verification
+# Toolkit Manager & Intel® Agent Toolkit — Setup & Verification
 
-Every blueprint runs on top of **Intel® AI for Enterprise Solutions** ("AI
-Solutions") with its **agent-toolkit layer** installed. The platform must be
-deployed **before** any use case. This page is the pre-flight checklist: deploy
-AI Solutions (agent-toolkit), allow the blueprint namespaces to reach LiteLLM,
-verify each service a blueprint depends on, then deploy a blueprint.
+Every blueprint runs on top of **Intel® Agent Toolkit**, installed and operated
+by **Toolkit Manager**. The Agent Toolkit must be installed **before** any use
+case. This page is the pre-flight checklist: install Intel® Agent Toolkit with
+Toolkit Manager, allow the blueprint namespaces to reach LiteLLM, verify each
+service a blueprint depends on, then deploy a blueprint.
 
 > **➡️ [github.com/intel/enterprise-ai-solutions (release-1.2)](https://github.com/intel/enterprise-ai-solutions/tree/release-1.2)**
-> — its `agent-toolkit` layer is
+> — Toolkit Manager's `agent-toolkit` layer installs Intel® Agent Toolkit
 > [intel/enterprise-agent-toolkit release-2.0.0](https://github.com/intel/enterprise-agent-toolkit/tree/release-2.0.0)
-> and its inference layer is
+> and pulls in Intel® Inference Toolkit
 > [intel/enterprise-inference release-1.1](https://github.com/intel/enterprise-inference/tree/release-1.1).
 
-## 1. Deploy AI Solutions (agent-toolkit)
+## 1. Install Intel® Agent Toolkit with Toolkit Manager
 
 ```bash
 git clone https://github.com/intel/enterprise-ai-solutions.git -b release-1.2
@@ -76,7 +76,7 @@ Run these before deploying a blueprint — each should show `Running`/`Ready` po
 | Component | Required by | Verify |
 |---|---|---|
 | **Whole layer** | all blueprints | `./es_auto_installer.sh validate agent-toolkit` |
-| **LiteLLM** (inference layer) | all blueprints | `kubectl get pods -n litellm` |
+| **LiteLLM** (Inference Toolkit) | all blueprints | `kubectl get pods -n litellm` |
 | **An LLM model** (tool-calling capable) | all blueprints | models `curl` below |
 | **Envoy Gateway** (`eg-gateway`) | external access | `kubectl get pods,gateway -n envoy-gateway-system` |
 | **Redis** | conversational memory | `kubectl get pods -n redis` |

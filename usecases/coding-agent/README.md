@@ -12,8 +12,8 @@ the agent process holds one sandbox pod, keeping installed packages and defined
 variables alive across tool calls.
 
 This use case runs on top of
-[Intel® AI for Enterprise Solutions](https://github.com/intel/enterprise-ai-solutions/tree/release-1.2)
-with its [agent-toolkit layer](https://github.com/intel/enterprise-agent-toolkit/tree/release-2.0.0).
+[Intel® Agent Toolkit](https://github.com/intel/enterprise-agent-toolkit/tree/release-2.0.0),
+installed and operated by [Toolkit Manager](https://github.com/intel/enterprise-ai-solutions/tree/release-1.2).
 
 ---
 
@@ -53,7 +53,7 @@ coding-agent-langgraph Pod ──(cluster DNS)──▶ sandbox-router-svc ─�
 ```
 
 - **LangGraph ReAct loop** (`create_react_agent`) drives tool selection and
-  multi-step reasoning against **LiteLLM** (AI Solutions inference layer). The
+  multi-step reasoning against **LiteLLM** (Intel® Inference Toolkit). The
   `coding-agent` namespace is in the Istio ambient mesh and must be listed in
   `litellm_allowed_namespaces`.
 - **Agent Sandbox** — the agent talks to the **sandbox-router** over in-cluster
@@ -73,17 +73,17 @@ coding-agent-langgraph Pod ──(cluster DNS)──▶ sandbox-router-svc ─�
 
 ## Prerequisites
 
-The following AI Solutions components must be running **before** deploying this
-use case. See the [AI Solutions setup guide](../../docs/ai-solutions-setup.md).
+The following Intel® Agent Toolkit components must be running **before** deploying this
+use case. See the [Toolkit Manager setup guide](../../docs/toolkit-manager-setup.md).
 
 | Component | Namespace | Switch (`env/<env>/config.agent-toolkit.yaml`) |
 |---|---|---|
 | Kubernetes, Istio, Envoy Gateway | — / `envoy-gateway-system` | installed by `./es_auto_installer.sh install agent-toolkit` |
-| LiteLLM | `litellm` | always installed by the inference layer |
+| LiteLLM | `litellm` | always installed by Intel® Inference Toolkit |
 | Agent Sandbox controller + router | `agent-sandbox-system` | `agent_sandbox_enabled` |
 | LLM model (tool-calling capable) | — | `llm_services_autodeploy_models` (default `["qwen2-5-coder-14b"]`) |
 | LiteLLM access from this namespace | — | add `coding-agent` to `litellm_allowed_namespaces` |
-| Langfuse (optional) | `langfuse` | installed by the inference layer |
+| Langfuse (optional) | `langfuse` | installed by Intel® Inference Toolkit |
 | KubeRay (optional) | `ray-system` | `kuberay_enabled`, plus `kuberay_ray_image: rayproject/ray:2.56.0-py312` to match the agent's Ray client (~=2.56.0) |
 
 Verify all prerequisites are up:
@@ -147,7 +147,7 @@ cd usecases/coding-agent
 
 To use the external URL, add `<eg-gateway-ip> coding-agent-langgraph.<base_domain_name>`
 to `/etc/hosts` and trust `env/local/logs/ai-solutions-ca.crt` (or use `curl -k`) —
-see [ai-solutions-setup.md](../../docs/ai-solutions-setup.md#3-reach-the-gateway-hostnames--ca).
+see [toolkit-manager-setup.md](../../docs/toolkit-manager-setup.md#3-reach-the-gateway-hostnames--ca).
 The route ships an empty SecurityPolicy so the gateway does not demand a LiteLLM
 key; the `DEVUI_AUTH_TOKEN` bearer token protects `/v1/*` instead.
 
@@ -218,7 +218,7 @@ local dev only.
 | `REDIS_URL` | auto-discovered (`redis-stack-server-credentials`) | Passed to the agent for checkpointing — see [Memory](#memory) (currently unused) |
 | `RAY_ENABLED` / `RAY_ADDRESS` | `false` / — | Ray parallel execution, e.g. `ray://ray-cluster-head-svc.ray-system.svc.cluster.local:10001` |
 | `WORKSPACE_DIR` | `/app/workspace` | Workspace volume (5Gi PVC) for the file tools |
-| `CLUSTER_URL` | auto-discovered | AI Solutions `base_domain_name`; route host is `coding-agent-langgraph.<CLUSTER_URL>` |
+| `CLUSTER_URL` | auto-discovered | Toolkit Manager `base_domain_name`; route host is `coding-agent-langgraph.<CLUSTER_URL>` |
 | `NAMESPACE` / `INGRESS_HOST` | `coding-agent` / `coding-agent-langgraph.<CLUSTER_URL>` | `deploy.sh` overrides |
 | `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY` | auto-discovered | Langfuse keys from `langfuse/langfuse-secrets` (optional — enables tracing) |
 | `LANGFUSE_HOST` | `http://langfuse-web.langfuse.svc.cluster.local:3000` | Langfuse URL — see [Observability guide](../../docs/observability-langfuse.md) |
@@ -390,7 +390,7 @@ kubectl logs -n coding-agent -l app.kubernetes.io/instance=coding-agent-langgrap
 coding-agent/
 ├── config/
 │   └── agent-config.env       # Docker Compose environment configuration
-├── deploy.sh                  # Kubernetes deploy script (AI Solutions)
+├── deploy.sh                  # Kubernetes deploy script (Intel® Agent Toolkit)
 ├── docker-compose.yml         # Local development stack
 ├── docs/
 │   ├── deployment.md          # Detailed deployment guide

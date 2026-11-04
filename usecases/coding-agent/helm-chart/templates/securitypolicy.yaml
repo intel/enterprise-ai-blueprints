@@ -1,7 +1,7 @@
 {{- if and .Values.httpRoute.enabled .Values.httpRoute.bypassGatewayAuth }}
 # Empty route-level SecurityPolicy: overrides the gateway-wide 'gateway-auth'
 # policy (LiteLLM key check) for this route only. The agent API enforces its own
-# DEVUI_AUTH_TOKEN bearer token. Same pattern AI Solutions uses for LiteLLM/Langfuse.
+# DEVUI_AUTH_TOKEN bearer token. Same pattern the platform uses for LiteLLM/Langfuse.
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: SecurityPolicy
 metadata:

@@ -1,6 +1,6 @@
 {{- if .Values.httpRoute.enabled }}
 {{- $fullname := include "deep-research-agent.fullname" . }}
-# Exposes the research API + web UI through the AI Solutions Envoy Gateway
+# Exposes the research API + web UI through the platform's Envoy Gateway
 # (Gateway API). TLS is terminated at the gateway's https listener
 # (*.<base_domain_name>). Served at the root: api.py mounts the static frontend
 # at "/" behind the /api and /health routes.

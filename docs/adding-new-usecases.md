@@ -2,8 +2,8 @@
 
 This guide explains how to add a new AI use case to this repository so that it
 follows the same structure, deploy flow, and documentation standards as the
-existing `coding-agent-maf`, and plugs into **Intel® AI for Enterprise Solutions**
-(agent-toolkit layer) — see [ai-solutions-setup.md](ai-solutions-setup.md).
+existing `coding-agent-maf`, and plugs into **Intel® Agent Toolkit**
+(installed by Toolkit Manager) — see [toolkit-manager-setup.md](toolkit-manager-setup.md).
 
 ---
 
@@ -43,7 +43,7 @@ usecases/<usecase-name>/
 
 Your use case application should:
 
-1. **Connect to LiteLLM** (AI Solutions inference layer) via the OpenAI-compatible API
+1. **Connect to LiteLLM** (Intel® Inference Toolkit) via the OpenAI-compatible API
    ```python
    import os
    from openai import OpenAI
@@ -252,7 +252,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Collect config
-CLUSTER_URL="${CLUSTER_URL:-}"            # ai-solutions base_domain_name, e.g. solutions.ai
+CLUSTER_URL="${CLUSTER_URL:-}"            # Toolkit Manager base_domain_name, e.g. solutions.ai
 OPENAI_API_KEY="${OPENAI_API_KEY:-}"
 MODEL_NAME="${MODEL_NAME:-}"
 NAMESPACE="${NAMESPACE:-<your-usecase>}"
@@ -319,7 +319,7 @@ services:
 The use case README should include these sections:
 
 1. **Overview** — What the use case does, architecture diagram
-2. **Prerequisites** — Required AI Solutions components / `config.agent-toolkit.yaml` switches
+2. **Prerequisites** — Required Intel® Agent Toolkit components / `config.agent-toolkit.yaml` switches
 3. **Quick Start** — Three commands to get it running
 4. **Configuration** — All environment variables in a table
 5. **API Reference** — All endpoints with `curl` examples
@@ -366,7 +366,7 @@ immediately deployable — no edit to the master script is needed:
 - [ ] `usecases/<usecase-name>/src/Dockerfile` builds cleanly
 - [ ] `usecases/<usecase-name>/helm-chart/` deploys with `helm install --dry-run`
 - [ ] `usecases/<usecase-name>/examples/` contains at least one `.py` and one `.sh`
-- [ ] Root `README.md` use case table updated (Category e.g. `AI Solutions · Agent Toolkit`)
+- [ ] Root `README.md` use case table updated (Category e.g. `Intel® Agent Toolkit`)
 - [ ] Chart ships an HTTPRoute (+ empty SecurityPolicy if the app has its own auth) — no Ingress
 - [ ] Pod/containers pass Pod Security `restricted` (UID/GID 10001, drop ALL, seccomp RuntimeDefault)
 - [ ] No hard `nodeAffinity` (`affinity: {}` by default)

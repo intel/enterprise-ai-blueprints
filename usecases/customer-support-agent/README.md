@@ -9,8 +9,8 @@ backed by **40 callable tools**, a SQLite database with seeded demo data,
 KubeRay cluster).
 
 This use case runs on top of
-[Intel® AI for Enterprise Solutions](https://github.com/intel/enterprise-ai-solutions/tree/release-1.2)
-with its [agent-toolkit layer](https://github.com/intel/enterprise-agent-toolkit/tree/release-2.0.0).
+[Intel® Agent Toolkit](https://github.com/intel/enterprise-agent-toolkit/tree/release-2.0.0),
+installed and operated by [Toolkit Manager](https://github.com/intel/enterprise-ai-solutions/tree/release-1.2).
 
 > ⚠️ **No user authentication — demo data only.** The UI and API have no login
 > and the chart's HTTPRoute bypasses the gateway's LiteLLM-key check, so anyone
@@ -116,13 +116,13 @@ updates, tickets) are lost on restart.
 
 ## Prerequisites
 
-The following AI Solutions components must be running **before** deploying this
-use case. See the [AI Solutions setup guide](../../docs/ai-solutions-setup.md).
+The following Intel® Agent Toolkit components must be running **before** deploying this
+use case. See the [Toolkit Manager setup guide](../../docs/toolkit-manager-setup.md).
 
 | Component | Namespace | Switch (`env/<env>/config.agent-toolkit.yaml`) |
 |---|---|---|
 | Kubernetes, Istio, Envoy Gateway | — / `envoy-gateway-system` | installed by `./es_auto_installer.sh install agent-toolkit` |
-| LiteLLM | `litellm` | always installed by the inference layer |
+| LiteLLM | `litellm` | always installed by Intel® Inference Toolkit |
 | Chat model | — | `llm_services_autodeploy_models` (default `["qwen2-5-coder-14b"]`) |
 | Embedding model `bge-base-en` (memory) | — | add `"bge-base-en"` to `llm_services_autodeploy_models` (optional — memory fails open) |
 | Redis Stack (memory) | `redis` | `redis_stack_enabled` |
@@ -188,7 +188,7 @@ cd usecases/customer-support-agent
 
 To use the external URL, add `<eg-gateway-ip> customer-support-agent.<base_domain_name>`
 to `/etc/hosts` and trust `env/local/logs/ai-solutions-ca.crt` (or use `curl -k`) —
-see [ai-solutions-setup.md](../../docs/ai-solutions-setup.md#3-reach-the-gateway-hostnames--ca).
+see [toolkit-manager-setup.md](../../docs/toolkit-manager-setup.md#3-reach-the-gateway-hostnames--ca).
 
 Or locally:
 
@@ -249,7 +249,7 @@ the Helm `configmap.yaml` / `secret.yaml` in Kubernetes and
 | `API_PORT` | `8502` | FastAPI backend listening port |
 | `STREAMLIT_PORT` | `8501` | Streamlit frontend listening port |
 | `DB_PATH` | `/app/data/techgadgets.db` | SQLite database file path (emptyDir in Kubernetes) |
-| `CLUSTER_URL` | auto-discovered | AI Solutions `base_domain_name`; route host is `customer-support-agent.<CLUSTER_URL>` (`deploy.sh` only) |
+| `CLUSTER_URL` | auto-discovered | Toolkit Manager `base_domain_name`; route host is `customer-support-agent.<CLUSTER_URL>` (`deploy.sh` only) |
 | `INGRESS_HOST` | `customer-support-agent.<CLUSTER_URL>` | HTTPRoute hostname override (`deploy.sh` only) |
 
 ### Memory (RediSearch + LiteLLM embeddings)
@@ -512,14 +512,14 @@ kubectl logs -n customer-support-agent -l app.kubernetes.io/name=customer-suppor
 ## Documentation
 
 - [Implementation Details](docs/implementation.md) — Architecture, agent loop, tool system, memory, database schema
-- [Deployment Guide](docs/deployment.md) — Kubernetes on AI Solutions, Docker Compose, Helm values, health checks, troubleshooting
+- [Deployment Guide](docs/deployment.md) — Kubernetes on Intel® Agent Toolkit, Docker Compose, Helm values, health checks, troubleshooting
 
 ## Project Structure
 
 ```
 customer-support-agent/
 ├── README.md                    # This file
-├── deploy.sh                    # Kubernetes deploy script (AI Solutions)
+├── deploy.sh                    # Kubernetes deploy script (Intel® Agent Toolkit)
 ├── docker-compose.yml           # Local Docker Compose stack
 ├── config/
 │   └── agent-config.env         # Docker Compose environment configuration

@@ -8,8 +8,8 @@ each agent session gets its own sandbox pod, keeping installed packages and
 defined variables alive across tool calls.
 
 This use case runs on top of
-[Intel® AI for Enterprise Solutions](https://github.com/intel/enterprise-ai-solutions/tree/release-1.2)
-with its [agent-toolkit layer](https://github.com/intel/enterprise-agent-toolkit/tree/release-2.0.0).
+[Intel® Agent Toolkit](https://github.com/intel/enterprise-agent-toolkit/tree/release-2.0.0),
+installed and operated by [Toolkit Manager](https://github.com/intel/enterprise-ai-solutions/tree/release-1.2).
 
 ---
 
@@ -49,7 +49,7 @@ LiteLLM                           Redis (memory)
   (litellm ns)                     (redis ns)
 ```
 
-- The coding agent talks to **LiteLLM** (AI Solutions inference layer) for all LLM
+- The coding agent talks to **LiteLLM** (Intel® Inference Toolkit) for all LLM
   inference. The `coding-agent-maf` namespace is in the Istio ambient mesh and
   must be listed in `litellm_allowed_namespaces`.
 - The coding agent calls the **sandbox-router** over in-cluster DNS — no
@@ -66,13 +66,13 @@ LiteLLM                           Redis (memory)
 
 ## Prerequisites
 
-The following AI Solutions components must be running **before** deploying this
-use case. See the [AI Solutions setup guide](../../docs/ai-solutions-setup.md).
+The following Intel® Agent Toolkit components must be running **before** deploying this
+use case. See the [Toolkit Manager setup guide](../../docs/toolkit-manager-setup.md).
 
 | Component | Namespace | Switch (`env/<env>/config.agent-toolkit.yaml`) |
 |---|---|---|
 | Kubernetes, Istio, Envoy Gateway | — / `envoy-gateway-system` | installed by `./es_auto_installer.sh install agent-toolkit` |
-| LiteLLM | `litellm` | always installed by the inference layer |
+| LiteLLM | `litellm` | always installed by Intel® Inference Toolkit |
 | Redis Stack | `redis` | `redis_stack_enabled` |
 | Agent Sandbox controller + router | `agent-sandbox-system` | `agent_sandbox_enabled` |
 | LLM model | — | `llm_services_autodeploy_models` (default `["qwen2-5-coder-14b"]`) |
@@ -134,7 +134,7 @@ the sandbox-router auth token and the Langfuse keys from the platform's secrets.
 
 To use the external URL, add `<eg-gateway-ip> coding-agent.<base_domain_name>` to
 `/etc/hosts` and trust `env/local/logs/ai-solutions-ca.crt` (or use `curl -k`) —
-see [ai-solutions-setup.md](../../docs/ai-solutions-setup.md#3-reach-the-gateway-hostnames--ca).
+see [toolkit-manager-setup.md](../../docs/toolkit-manager-setup.md#3-reach-the-gateway-hostnames--ca).
 The route ships an empty SecurityPolicy so the gateway does not demand a LiteLLM
 key; the DevUI token protects it instead.
 
@@ -204,7 +204,7 @@ The DevUI is available at **http://localhost:8090**.
 | `SANDBOX_ROUTER_TOKEN` | — | Bearer token for the router when `ALLOW_UNAUTHENTICATED_ROUTER=false` |
 | `SANDBOX_TEMPLATE` | `python-sandbox-template` | SandboxTemplate name to use |
 | `WORKSPACE_DIR` | `/app/workspace` | Workspace volume mount path |
-| `CLUSTER_URL` | auto-discovered | AI Solutions `base_domain_name`; route host is `coding-agent.<CLUSTER_URL>` |
+| `CLUSTER_URL` | auto-discovered | Toolkit Manager `base_domain_name`; route host is `coding-agent.<CLUSTER_URL>` |
 | `LANGFUSE_PUBLIC_KEY` | auto-discovered | Langfuse public key (optional — enables tracing; from `langfuse-secrets`) |
 | `LANGFUSE_SECRET_KEY` | — | Langfuse secret key (optional) |
 | `LANGFUSE_HOST` | `http://langfuse-web.langfuse.svc.cluster.local:3000` | Langfuse URL (optional) — see [Observability guide](../../docs/observability-langfuse.md) |

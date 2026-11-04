@@ -82,7 +82,7 @@ async def health_check() -> dict:
     # Check vLLM connectivity
     try:
         async with httpx.AsyncClient() as client:
-            # LiteLLM (AI Solutions) requires a key on /models.
+            # LiteLLM (Intel Inference Toolkit) requires a key on /models.
             resp = await client.get(
                 f"{settings.llm_base_url}/models",
                 headers={"Authorization": f"Bearer {settings.llm_api_key}"} if settings.llm_api_key else None,
@@ -116,7 +116,7 @@ async def health_check() -> dict:
 async def system_status() -> dict:
     """Return health status of the primary and secondary model backends.
 
-    Both slots route through the AI Solutions LiteLLM gateway. The gateway's
+    Both slots route through the Intel Inference Toolkit LiteLLM gateway. The gateway's
     authenticated `/health?model=<name>` endpoint actually pings the upstream
     backend (Bedrock / Xeon vLLM) and reports it under healthy/unhealthy_endpoints,
     so a green light means "this model is reachable *through LiteLLM*",

@@ -312,7 +312,7 @@ def execute_python_code_parallel(
     benchmarks, data transforms, simulations) that would otherwise run sequentially.
 
     Requirements:
-    - kuberay_enabled: true must be set in config.agent-toolkit.yaml (AI Solutions)
+    - kuberay_enabled: true must be set in config.agent-toolkit.yaml (Toolkit Manager)
     - ray.enabled=true and ray.address must be configured in the Coding Agent Helm values
     - The Ray cluster must be reachable from inside the Kubernetes pod
 

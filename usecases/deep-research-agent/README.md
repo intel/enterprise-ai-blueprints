@@ -10,8 +10,8 @@ breaker. It ships with its own web UI, a REST + SSE API, and an optional live
 metrics dashboard.
 
 This use case runs on top of
-[Intel® AI for Enterprise Solutions](https://github.com/intel/enterprise-ai-solutions/tree/release-1.2)
-with its [agent-toolkit layer](https://github.com/intel/enterprise-agent-toolkit/tree/release-2.0.0).
+[Intel® Agent Toolkit](https://github.com/intel/enterprise-agent-toolkit/tree/release-2.0.0),
+installed and operated by [Toolkit Manager](https://github.com/intel/enterprise-ai-solutions/tree/release-1.2).
 
 > **This use case deploys no models.** The LLM is consumed over HTTP from
 > LiteLLM (`LLM_BASE_URL` + `LLM_API_KEY` + `LLM_MODEL`). There are no model
@@ -47,7 +47,7 @@ with its [agent-toolkit layer](https://github.com/intel/enterprise-agent-toolkit
                             ▼               ▼
                  LiteLLM                   Tavily  (required)
                  litellm.litellm.svc:4000  Serper  (optional)
-                 (inference layer)         — needs direct internet egress
+                 (Inference Toolkit)       — needs direct internet egress
 ```
 
 - **Agent** (`src/agent/`) — LangGraph graph: a `classify` node routes each query
@@ -82,13 +82,13 @@ per-node LLM calls.
 
 ## 2. Prerequisites
 
-The following AI Solutions components must be running **before** deploying this
-use case. See the [AI Solutions setup guide](../../docs/ai-solutions-setup.md).
+The following Intel® Agent Toolkit components must be running **before** deploying this
+use case. See the [Toolkit Manager setup guide](../../docs/toolkit-manager-setup.md).
 
 | Component | Namespace | Switch (`env/<env>/config.agent-toolkit.yaml`) |
 |---|---|---|
 | Kubernetes, Istio, Envoy Gateway | — / `envoy-gateway-system` | installed by `./es_auto_installer.sh install agent-toolkit` |
-| LiteLLM | `litellm` | always installed by the inference layer |
+| LiteLLM | `litellm` | always installed by Intel® Inference Toolkit |
 | LLM model (**tool-calling capable**) | — | `llm_services_autodeploy_models` (default `["qwen2-5-coder-14b"]`) |
 | LiteLLM access from this namespace | — | add `deep-research-agent` to `litellm_allowed_namespaces` |
 
@@ -166,7 +166,7 @@ Both prompt for anything they cannot discover (the model, defaulting to
 
 To use the external URL, add `<eg-gateway-ip> deep-research-agent.<base_domain_name>`
 to `/etc/hosts` and trust `env/local/logs/ai-solutions-ca.crt` (or use `curl -k`) —
-see [ai-solutions-setup.md](../../docs/ai-solutions-setup.md#3-reach-the-gateway-hostnames--ca).
+see [toolkit-manager-setup.md](../../docs/toolkit-manager-setup.md#3-reach-the-gateway-hostnames--ca).
 The route ships an empty SecurityPolicy (`httpRoute.bypassGatewayAuth: true`) so
 the gateway does not demand a LiteLLM key from the browser.
 
@@ -307,7 +307,7 @@ Valid module names: `classify`, `cat1_answer`, `cat2_answer`, `agent`,
 | `DATABASE_URL` | derived from `agent.storage.mountPath` | `sqlite+aiosqlite:////app/data/deep_research.db` | SQLite location (on the volume) |
 | `RESULTS_DIR` | derived from `agent.storage.mountPath` | `/app/data/results/live` | Per-query metrics dir (on the volume) |
 | `NO_PROXY` / `no_proxy` | `agent.noProxy` | `localhost,127.0.0.1,.svc,.svc.cluster.local,10.0.0.0/8,…` | Hosts that bypass a proxy. The chart sets no `http_proxy`/`https_proxy` |
-| `CLUSTER_URL` | — | auto-discovered | AI Solutions `base_domain_name`; route host is `deep-research-agent.<CLUSTER_URL>` (`deploy.sh` only) |
+| `CLUSTER_URL` | — | auto-discovered | Toolkit Manager `base_domain_name`; route host is `deep-research-agent.<CLUSTER_URL>` (`deploy.sh` only) |
 | `INGRESS_HOST` / `DASHBOARD_HOST` | `httpRoute.host` / `httpRoute.dashboardHost` | `deep-research-agent.<base>` / `deep-research-agent-dashboard.<base>` | HTTPRoute hostnames (`deploy.sh` only) |
 
 Chart-only values: `agent.image.*`, `agent.replicaCount` (**keep at 1** — the

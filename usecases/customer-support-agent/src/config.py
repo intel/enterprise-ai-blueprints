@@ -21,7 +21,7 @@ REDIS_URL = os.getenv("REDIS_URL", "redis://redis-stack-server.redis.svc.cluster
 MEMORY_INDEX = os.getenv("MEMORY_INDEX", "csa_mem_idx")
 MEMORY_TOP_K = int(os.getenv("MEMORY_TOP_K", "4"))
 
-# Embeddings served by LiteLLM (AI Solutions catalog name for BAAI/bge-base-en-v1.5)
+# Embeddings served by LiteLLM (Inference Toolkit catalog name for BAAI/bge-base-en-v1.5)
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "bge-base-en")
 EMBEDDING_DIMS = int(os.getenv("EMBEDDING_DIMS", "768"))
 

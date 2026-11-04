@@ -4,7 +4,7 @@
 # examples/generate_code.sh
 # curl-based examples for the Coding Agent (LangGraph) API.
 # Usage: AUTH_TOKEN=<DEVUI_AUTH_TOKEN> ./generate_code.sh [AGENT_URL]
-# Default AGENT_URL: http://localhost:8090 (port-forward). Via the AI Solutions
+# Default AGENT_URL: http://localhost:8090 (port-forward). Via the platform
 # gateway use https://coding-agent-langgraph.<base_domain_name> (self-signed CA:
 # CURL_OPTS=-k or --cacert env/<env>/logs/ai-solutions-ca.crt).
 

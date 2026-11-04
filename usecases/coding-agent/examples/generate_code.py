@@ -8,7 +8,7 @@ Coding Agent (LangGraph) — Python client examples using httpx.
 
 Usage:
     AUTH_TOKEN=<DEVUI_AUTH_TOKEN> python3 generate_code.py [AGENT_URL]
-    Default AGENT_URL: http://localhost:8090 (port-forward). Via the AI Solutions
+    Default AGENT_URL: http://localhost:8090 (port-forward). Via the platform
     gateway: https://coding-agent-langgraph.<base_domain_name> (set VERIFY=false
     for the default self-signed CA, or VERIFY=<path to ai-solutions-ca.crt>).
 

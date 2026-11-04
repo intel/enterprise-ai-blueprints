@@ -1,5 +1,5 @@
 {{- if .Values.httpRoute.enabled }}
-# Exposes the agent through the AI Solutions Envoy Gateway (Gateway API).
+# Exposes the agent through the platform's Envoy Gateway (Gateway API).
 # TLS is terminated at the gateway's https listener (*.<base_domain_name>).
 # /api and /v1 go to FastAPI; everything else (incl. Streamlit's websocket at
 # /_stcore/stream) goes to the Streamlit UI.

@@ -1,4 +1,4 @@
-# Git ignore for AI Blueprints (Intel® AI for Enterprise Solutions) — Use Cases
+# Git ignore for AI Blueprints (Intel® Agent Toolkit) — Use Cases
 
 # Python
 __pycache__/

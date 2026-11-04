@@ -3,7 +3,7 @@
 # Empty route-level SecurityPolicy: overrides the gateway-wide 'gateway-auth'
 # policy (LiteLLM key check) for this blueprint's routes only, so browsers can
 # open the UI. App-level auth is agent.apiKeys (X-API-Key on /api/*). Same
-# pattern AI Solutions uses for LiteLLM/Langfuse.
+# pattern the platform uses for LiteLLM/Langfuse.
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: SecurityPolicy
 metadata:

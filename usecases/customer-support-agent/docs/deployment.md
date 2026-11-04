@@ -1,8 +1,8 @@
 # Deployment Guide
 
 This guide covers deploying the TechGadgets Customer Support Agent on
-[Intel® AI for Enterprise Solutions](https://github.com/intel/enterprise-ai-solutions/tree/release-1.2)
-(release-1.2, agent-toolkit layer) with Helm, and running it locally with Docker
+[Intel® Agent Toolkit](https://github.com/intel/enterprise-agent-toolkit/tree/release-2.0.0) (installed by
+[Toolkit Manager](https://github.com/intel/enterprise-ai-solutions/tree/release-1.2) release-1.2) with Helm, and running it locally with Docker
 Compose.
 
 > ⚠️ **No user authentication — demo data only.** The Streamlit UI, the FastAPI
@@ -16,13 +16,13 @@ Compose.
 
 ### Platform
 
-Deploy AI Solutions (agent-toolkit) first — see the
-[AI Solutions setup guide](../../../docs/ai-solutions-setup.md).
+Install Intel® Agent Toolkit with Toolkit Manager first — see the
+[Toolkit Manager setup guide](../../../docs/toolkit-manager-setup.md).
 
 | Component | Namespace | Switch (`env/<env>/config.agent-toolkit.yaml`) |
 |---|---|---|
 | Kubernetes, Istio, Envoy Gateway (`eg-gateway`) | — / `envoy-gateway-system` | installed by `./es_auto_installer.sh install agent-toolkit` |
-| LiteLLM | `litellm` | always installed by the inference layer |
+| LiteLLM | `litellm` | always installed by Intel® Inference Toolkit |
 | Chat model | — | `llm_services_autodeploy_models` (default `["qwen2-5-coder-14b"]`) |
 | Embedding model `bge-base-en` | — | add `"bge-base-en"` to `llm_services_autodeploy_models` (needed for memory only) |
 | Redis Stack | `redis` | `redis_stack_enabled` (needed for memory only) |
@@ -51,7 +51,7 @@ chat model does **not** need native function-calling support.
 
 | Mode | Requires |
 |---|---|
-| Kubernetes | `kubectl` (AI Solutions kubeconfig, `env/<env>/kubeconfig.yaml`), `helm` 3, and `nerdctl` (or `docker`) to build the image |
+| Kubernetes | `kubectl` (Toolkit Manager kubeconfig, `env/<env>/kubeconfig.yaml`), `helm` 3, and `nerdctl` (or `docker`) to build the image |
 | Docker | Docker Engine 24+ with Compose v2, and a reachable LiteLLM endpoint + key |
 
 ## Kubernetes Deployment
@@ -112,7 +112,7 @@ kubectl logs -n customer-support-agent deploy/customer-support-agent | grep -E "
 ### Step 4: Access
 
 Map the hostname to the gateway IP and trust the platform CA (see
-[ai-solutions-setup.md](../../../docs/ai-solutions-setup.md#3-reach-the-gateway-hostnames--ca)):
+[toolkit-manager-setup.md](../../../docs/toolkit-manager-setup.md#3-reach-the-gateway-hostnames--ca)):
 
 ```bash
 kubectl get svc -n envoy-gateway-system \
@@ -171,7 +171,7 @@ helm upgrade --install customer-support-agent ./helm-chart \
 | `agent.llmApiKey` | string | `""` | **Required.** LiteLLM key (stored in the Secret) |
 | `agent.llmModel` | string | `qwen2-5-coder-14b` | Chat model registered in LiteLLM |
 | `agent.memory.enabled` | bool | `true` | Long-term memory (fail-open) |
-| `agent.memory.redisUrl` | string | `redis://redis-stack-server.redis.svc.cluster.local:6379/0` | Redis URL — must include credentials on AI Solutions (`deploy.sh` sets it) |
+| `agent.memory.redisUrl` | string | `redis://redis-stack-server.redis.svc.cluster.local:6379/0` | Redis URL — must include credentials on Intel® Agent Toolkit (`deploy.sh` sets it) |
 | `agent.memory.index` | string | `csa_mem_idx` | RediSearch index name |
 | `agent.memory.topK` | int | `4` | Memories recalled per query |
 | `agent.memory.embeddingModel` | string | `bge-base-en` | Embedding model served by LiteLLM |
