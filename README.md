@@ -33,7 +33,6 @@ cluster (most endpoints are auto-discovered), and deploy.
 - [Use Case Catalog](#use-case-catalog)
 - [Getting Started](#getting-started)
 - [Deploy a Use Case](#deploy-a-use-case)
-- [Migrating from the standalone Agent Toolkit](#migrating-from-the-standalone-agent-toolkit)
 - [Roadmap: native AI Solutions layer](#roadmap-native-ai-solutions-layer)
 - [Repository Structure](#repository-structure)
 - [Documentation](#documentation)
@@ -205,25 +204,6 @@ scripts prompt for anything still unset. In Kubernetes mode the deploy
 auto-discovers cluster services so you rarely need to set URLs by hand. It also
 labels the namespace for the Istio ambient mesh and Pod Security `restricted`,
 and warns if the namespace is not yet in `litellm_allowed_namespaces`.
-
----
-
-## Migrating from the standalone Agent Toolkit
-
-Blueprints previously targeted the standalone Agent Toolkit (old `main` of
-`intel/enterprise-agent-toolkit`). With AI Solutions the endpoints moved:
-
-| What | Old (standalone toolkit) | New (AI Solutions release-1.2) |
-|---|---|---|
-| LLM gateway (in-cluster) | `genai-gateway-service.genai-gateway:4000` | `http://litellm.litellm.svc.cluster.local:4000/v1` |
-| LLM gateway (external) | `https://api.<domain>/v1` | `https://litellm.<base_domain_name>/v1` |
-| LLM key | `LITELLM_MASTER_KEY` env on the gateway deployment | Secret `litellm-master-key` (ns `litellm`), or a virtual key |
-| Langfuse | `genai-gateway-trace-web.genai-gateway:3000`, `trace-api.<domain>` | `http://langfuse-web.langfuse.svc.cluster.local:3000`, `langfuse.<base>` |
-| Langfuse keys | env on the gateway deployment | Secret `langfuse-secrets` (ns `langfuse`) |
-| Exposure | nginx Ingress + per-app TLS secret | HTTPRoute on Envoy Gateway `eg-gateway` (TLS at gateway) |
-| Feature flags | `deploy_genai_gateway`, `deploy_redis`, `deploy_agent_sandbox`, `deploy_kuberay`, `models=…` | LiteLLM always installed; `redis_stack_enabled`, `agent_sandbox_enabled`, `kuberay_enabled`, `llm_services_autodeploy_models` |
-| Node placement | `ei-inference-eligible=true` affinity | no affinity (`affinity: {}`) |
-| Redis, Agent Sandbox | — | unchanged |
 
 ---
 
