@@ -24,6 +24,11 @@ cluster (most endpoints are auto-discovered), and deploy.
 > **New here?** Read [Prerequisites](#prerequisites) first — a blueprint cannot
 > run without AI Solutions (agent-toolkit layer) deployed.
 
+> [!NOTE]
+> **Coming soon:** the blueprints will be installable directly through the AI
+> Solutions installer as their own layer (`./es_auto_installer.sh install blueprints`).
+> See [ROADMAP.md](ROADMAP.md).
+
 ---
 
 ## Table of Contents
@@ -33,7 +38,6 @@ cluster (most endpoints are auto-discovered), and deploy.
 - [Use Case Catalog](#use-case-catalog)
 - [Getting Started](#getting-started)
 - [Deploy a Use Case](#deploy-a-use-case)
-- [Roadmap: native AI Solutions layer](#roadmap-native-ai-solutions-layer)
 - [Repository Structure](#repository-structure)
 - [Documentation](#documentation)
 - [Known limitations](#known-limitations)
@@ -213,23 +217,6 @@ and warns if the namespace is not yet in `litellm_allowed_namespaces`.
 
 ---
 
-## Roadmap: native AI Solutions layer
-
-The blueprints will soon be installable **directly through the AI Solutions
-installer as their own layer** — registered via
-`configs/repos/repos.blueprints.yaml` + `components.yaml` and Ansible roles, so
-that deployment becomes:
-
-```bash
-./es_auto_installer.sh init blueprints
-./es_auto_installer.sh install blueprints
-```
-
-Until then, install AI Solutions (agent-toolkit) first and deploy blueprints with
-`./deploy-usecase.sh` as described above.
-
----
-
 ## Repository Structure
 
 ```
@@ -237,6 +224,7 @@ Until then, install AI Solutions (agent-toolkit) first and deploy blueprints wit
 ├── README.md                  # This file
 ├── CONTRIBUTING.md            # How to add a use case / contribute
 ├── SECURITY.md                # Reporting + accepted scan exceptions
+├── ROADMAP.md                 # Planned work (native AI Solutions layer)
 ├── LICENSE
 ├── config.env                 # Unified configuration template
 ├── deploy-usecase.sh          # One-click dispatcher (delegates to each use case)
@@ -283,6 +271,7 @@ security scans auto-discover any directory that contains a `deploy.sh`.
 | [docs/observability-langfuse.md](docs/observability-langfuse.md) | Enabling Langfuse tracing for a use case (projects, keys, OTEL) |
 | [docs/adding-new-usecases.md](docs/adding-new-usecases.md) | Authoring a new blueprint that matches repo standards |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution workflow, DCO sign-off, linting, PRs |
+| [ROADMAP.md](ROADMAP.md) | Planned work, incl. the native AI Solutions `blueprints` layer |
 
 Each use case also has its own README with architecture, configuration, API
 reference, and troubleshooting.

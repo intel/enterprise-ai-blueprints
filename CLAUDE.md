@@ -14,7 +14,7 @@ The blueprints only *consume* the platform. They never install or modify platfor
 
 **Roadmap:** blueprints will be packaged as a native AI Solutions layer
 (`configs/repos/repos.blueprints.yaml` in ai-solutions, plus `components.yaml`, `config.yaml` and
-Ansible roles here). Until that lands, deployment is the standalone Helm + `deploy.sh` flow below.
+Ansible roles here; see `ROADMAP.md`). Until that lands, deployment is the standalone Helm + `deploy.sh` flow below.
 Don't add Ansible/layer files unless asked.
 
 ## Layout
