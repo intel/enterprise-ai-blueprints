@@ -17,13 +17,21 @@ COPY requirements.txt .
 # gcc and libffi-dev are required to compile native extensions pulled in by
 # ray[default] (e.g. grpcio) when no pre-built wheel is available for the
 # python:3.12-slim base image.
+# Strip Ray components these images never use (they only connect to a Ray
+# cluster as a client): ray_dist.jar is for Java/cross-language workers, and the
+# runtime-env agent's vendored libraries (aiohttp, multidict, ...) are only loaded
+# on Ray cluster nodes. Both carry unpatched CVEs (jackson-databind, guava,
+# httpcore5, aiohttp, multidict).
 # apt-get upgrade patches base-image OS packages flagged by the image scan
 # (perl-base, gzip, libpcre2-8, libsqlite3, ...) to their fixed Debian versions.
 RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
         gcc \
         libffi-dev \
     && rm -rf /var/lib/apt/lists/* \
-    && pip install --no-cache-dir -r requirements.txt
+    && pip install --no-cache-dir --upgrade "pip>=26.2" \
+    && pip install --no-cache-dir -r requirements.txt \
+    && rm -rf /usr/local/lib/python3.12/site-packages/ray/jars \
+              /usr/local/lib/python3.12/site-packages/ray/_private/runtime_env/agent/thirdparty_files
 
 # Copy application
 COPY agent.py .

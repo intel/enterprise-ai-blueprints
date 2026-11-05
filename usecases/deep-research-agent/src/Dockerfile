@@ -39,6 +39,11 @@ ARG HTTPS_PROXY
 ARG no_proxy
 ARG NO_PROXY
 
+# apt-get upgrade patches base-image OS packages flagged by the image scan
+# to their fixed Debian versions.
+RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/* \
+    && pip install --no-cache-dir --upgrade "pip>=26.2"
+
 # Numeric UID/GID 10001 so runAsNonRoot can be verified (PSS restricted).
 RUN groupadd -r -g 10001 researcher && useradd -r -u 10001 -g researcher -d /app researcher
 
