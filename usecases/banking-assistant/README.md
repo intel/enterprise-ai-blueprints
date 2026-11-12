@@ -1,11 +1,13 @@
 # Banking Assistant
 
-A conversational banking assistant built on the Agentic AI Stack. It routes
-natural-language requests ("what's my balance?", "transfer $200 to savings",
-"when is my loan payment due?") to a GenAI-gateway model, and uses a **Model
+A conversational banking assistant built on
+[Intel® Agent Toolkit](https://github.com/intel/enterprise-agent-toolkit/tree/release-2.0.0), installed by
+[Toolkit Manager](https://github.com/intel/enterprise-ai-solutions/tree/release-1.2). It routes natural-language requests ("what's my balance?",
+"transfer $200 to savings", "when is my loan payment due?") to a model served
+through LiteLLM, and uses a **Model
 Context Protocol (MCP)** server for all factual account data and operations.
 
-This is the stack's reference example of an **MCP client/server split**: the
+This is the blueprints' reference example of an **MCP client/server split**: the
 banking tools live in a standalone FastMCP server that runs as a **sidecar
 container** in the same pod as the agent. The agent connects to it as a remote
 MCP client over loopback.
@@ -30,8 +32,8 @@ MCP client over loopback.
                     └─────────────┼─────────────────────────────┼───────────┘
                                   │ model calls                 │ reads/writes
                                   ▼                             ▼
-                       GenAI Gateway (LiteLLM)        synthetic in-memory data
-                       genai-gateway.svc:4000         (users, accounts, loans)
+                       LiteLLM                        synthetic in-memory data
+                       litellm.litellm.svc:4000       (users, accounts, loans)
                                                        (+ optional Redis memory)
 ```
 
@@ -66,27 +68,37 @@ Demo users: `U1001` (Ada Lovelace), `U1002` (Alan Turing), `U1003` (Grace Hopper
 
 ## 2. Prerequisites
 
-- A running **Agentic AI Stack** with the **GenAI Gateway (LiteLLM)** reachable
-  and a **tool-calling-capable model** registered (e.g.
-  `Qwen/Qwen3-Coder-30B-A3B-Instruct`). See the stack setup docs.
+- A running **Intel® Agent Toolkit** (installed with Toolkit Manager) with
+  **LiteLLM** reachable and a **tool-calling-capable model** registered (e.g.
+  `qwen2-5-coder-14b`, the `llm_services_autodeploy_models` default). See the
+  [Toolkit Manager setup guide](../../docs/toolkit-manager-setup.md).
+- The `banking-assistant` namespace listed in `litellm_allowed_namespaces` in
+  `env/<env>/config.agent-toolkit.yaml` (then re-run
+  `./es_auto_installer.sh install agent-toolkit`). `deploy.sh` labels the
+  namespace for the Istio ambient mesh and Pod Security `restricted`, and warns
+  if it is not allowed yet (`PATCH_LITELLM_AUTHZ=true` patches the policy as a
+  stop-gap).
 - **Redis** (optional, for conversation memory) — the shared instance in the
-  `redis` namespace. It **requires authentication**: use the authenticated
+  `redis` namespace (`redis_stack_enabled`). It **requires authentication**: use the authenticated
   `REDIS_URL` from the `redis-stack-server-credentials` secret (`deploy.sh`
   auto-discovers it), or set `ENABLE_MEMORY=false` to skip memory.
 - `kubectl` + `helm` for cluster deploy, or Docker + Docker Compose for local dev.
-- The `banking-assistant` and `banking-mcp` container images built and pushed to
-  a registry the cluster can pull from.
+- The `banking-assistant` and `banking-mcp` container images — `deploy.sh` builds
+  them into the cluster's containerd, or set `SKIP_BUILD=true` and point at a
+  registry (see below).
 
 ---
 
 ## 3. Quick Start
 
 `deploy.sh` does everything: builds BOTH images (agent + MCP sidecar), creates
-the namespace, sets up the TLS secret, and installs the Helm chart. On
+and labels the namespace, auto-discovers the LiteLLM URL/key, Redis URL and
+Langfuse keys, and installs the Helm chart with an HTTPRoute on the platform's
+Envoy Gateway (`eg-gateway`, which terminates TLS — no certificate needed). On
 containerd clusters it builds with nerdctl into the `k8s.io` namespace so the
 kubelet can use the images locally (`pullPolicy: IfNotPresent`).
 
-Run it interactively (it prompts for cluster domain, API key, and model):
+Run it interactively (it prompts for anything it cannot discover, e.g. the model):
 
 ```bash
 cd usecases/banking-assistant
@@ -99,12 +111,9 @@ dummy values with your own):
 ```bash
 cd usecases/banking-assistant
 
-CLUSTER_URL="api.example.com" \
+CLUSTER_URL="solutions.ai" \
 OPENAI_API_KEY="sk-your-litellm-key" \
-MODEL_NAME="Qwen/Qwen2.5-Coder-14B-Instruct" \
-INGRESS_HOST="banking-assistant.api.example.com" \
-CERT_FILE="/path/to/cert.pem" \
-KEY_FILE="/path/to/key.pem" \
+MODEL_NAME="qwen2-5-coder-14b" \
 ./deploy.sh
 ```
 
@@ -114,20 +123,18 @@ off to this same `deploy.sh`:
 ```bash
 cd ../..   # repo root
 
-CLUSTER_URL="api.example.com" \
+CLUSTER_URL="solutions.ai" \
 OPENAI_API_KEY="sk-your-litellm-key" \
-MODEL_NAME="Qwen/Qwen2.5-Coder-14B-Instruct" \
-INGRESS_HOST="banking-assistant.api.example.com" \
-CERT_FILE="/path/to/cert.pem" \
-KEY_FILE="/path/to/key.pem" \
+MODEL_NAME="qwen2-5-coder-14b" \
 ./deploy-usecase.sh banking-assistant
 ```
 
 Then open the DevUI (or port-forward) and chat:
 
 ```bash
-# Via ingress (once DNS for INGRESS_HOST points at your ingress controller):
-#   https://banking-assistant.api.example.com
+# Via the gateway (add "<eg-gateway-ip> banking-assistant.<base_domain_name>" to
+# /etc/hosts and trust env/local/logs/ai-solutions-ca.crt, or accept the self-signed cert):
+#   https://banking-assistant.solutions.ai
 
 # Or locally:
 kubectl port-forward -n banking-assistant svc/banking-assistant 8090:8090
@@ -158,9 +165,10 @@ SKIP_BUILD=true AGENT_IMAGE=myregistry/banking-assistant:1.0 \
   MCP_IMAGE=myregistry/banking-mcp:1.0 ./deploy.sh
 ```
 
-> **TLS is optional.** Omit `CERT_FILE`/`KEY_FILE` to deploy without TLS
-> (`deploy.sh` will prompt; leave the cert path blank to skip). If you already
-> have a TLS secret in the namespace, pass `TLS_SECRET_NAME=<secret>` instead.
+> **TLS is handled by the gateway.** `eg-gateway` terminates TLS for
+> `*.<base_domain_name>` with its wildcard secret `gateway-tls`. The chart's HTTPRoute
+> ships an empty route-level SecurityPolicy (`httpRoute.bypassGatewayAuth: true`)
+> so the gateway does not demand a LiteLLM key — the DevUI token protects the app.
 
 ---
 
@@ -173,16 +181,16 @@ All configuration is read from environment variables (wired via the Helm
 
 | Variable | Default | Description |
 |---|---|---|
-| `OPENAI_BASE_URL` | in-cluster gateway | GenAI Gateway (LiteLLM) OpenAI-compatible URL |
-| `OPENAI_API_KEY` | — (required) | LiteLLM API key |
-| `MODEL_NAME` | — (required) | Model id in LiteLLM; **must support tool calling** |
+| `OPENAI_BASE_URL` | `http://litellm.litellm.svc.cluster.local:4000/v1` | LiteLLM OpenAI-compatible URL (auto-discovered) |
+| `OPENAI_API_KEY` | — (required) | LiteLLM key (falls back to `litellm-master-key`; a virtual key is recommended) |
+| `MODEL_NAME` | — (required) | Model id in LiteLLM (e.g. `qwen2-5-coder-14b`); **must support tool calling** |
 | `MCP_SERVER_URL` | `http://localhost:8000/mcp` | Banking MCP endpoint (loopback in sidecar mode) |
 | `REDIS_URL` | in-cluster redis | Redis URL for conversation memory. **Must include credentials** (`redis://default:<password>@…`) — the shared Redis requires auth; a passwordless URL crashes runs with `NOAUTH Authentication required.` `deploy.sh` auto-discovers it from `redis-stack-server-credentials`. |
 | `ENABLE_MEMORY` | `true` | Set `false` to disable Redis memory (skips the Redis dependency entirely) |
 | `DEVUI_HOST` | `0.0.0.0` | Host DevUI binds to |
 | `DEVUI_AUTH_TOKEN` | auto-generated | DevUI login token |
 | `AUTO_OPEN_BROWSER` | `false` | Whether DevUI opens a browser |
-| `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY` / `LANGFUSE_HOST` | — | Optional observability — see [Observability guide](../../docs/observability-langfuse.md) |
+| `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY` / `LANGFUSE_HOST` | — | Optional observability (auto-discovered from `langfuse-secrets`) — see [Observability guide](../../docs/observability-langfuse.md) |
 
 ### MCP container
 
@@ -239,9 +247,9 @@ AGENT_URL=http://localhost:8090 python3 examples/banking_client.py
 ## 7. Local Development
 
 ```bash
-export LITELLM_URL=http://your-host:4000/v1
-export LITELLM_API_KEY=sk-your-key
-export MODEL_NAME=Qwen/Qwen3-Coder-30B-A3B-Instruct   # must support tool calling
+export LITELLM_URL=https://litellm.solutions.ai/v1   # https://litellm.<base_domain_name>/v1
+export LITELLM_API_KEY=sk-your-litellm-key          # LiteLLM virtual key
+export MODEL_NAME=qwen2-5-coder-14b                 # must support tool calling
 
 docker compose up --build
 #   banking-mcp        → :8000  (MCP server)
@@ -267,6 +275,8 @@ cd src && MCP_PORT=8000 python -m mcp_server.server
 | Transfers/payments "forget" after a restart | Expected — data is in-memory and resets on restart (see below). |
 | `401 Missing or invalid Authorization header` | DevUI requires `Authorization: Bearer <DEVUI_AUTH_TOKEN>` on all `/v1/*` routes. Pass the token `deploy.sh` printed. |
 | Agent run fails instantly with `Authentication required.` | Redis needs auth. Set `REDIS_URL` to the authenticated URL from `redis-stack-server-credentials` (or set `ENABLE_MEMORY=false`). |
+| LLM calls fail with `RBAC: access denied` / connection reset | Namespace not allowed to reach LiteLLM. Add `banking-assistant` to `litellm_allowed_namespaces` and re-run `./es_auto_installer.sh install agent-toolkit` (or redeploy with `PATCH_LITELLM_AUTHZ=true`). |
+| `401` from the gateway on `https://banking-assistant.<base>` | The gateway-wide `gateway-auth` policy applies — keep `httpRoute.bypassGatewayAuth=true` so the route-level SecurityPolicy is installed. |
 | `/health` | Returns JSON `{"status":"healthy",...}` with 200 (no auth). Kubernetes liveness/readiness use a TCP check on 8090. |
 
 ---

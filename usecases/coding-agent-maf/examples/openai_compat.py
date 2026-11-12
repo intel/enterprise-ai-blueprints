@@ -24,6 +24,8 @@ import urllib.request
 from openai import OpenAI
 
 AGENT_URL = os.environ.get("AGENT_URL", "http://localhost:8090").rstrip("/")
+if not AGENT_URL.startswith(("http://", "https://")):
+    raise SystemExit(f"AGENT_URL must be an http(s) URL, got: {AGENT_URL}")
 TOKEN = os.environ.get("DEVUI_AUTH_TOKEN", "")
 if not TOKEN:
     raise SystemExit("Set DEVUI_AUTH_TOKEN (printed by deploy.sh).")
@@ -36,7 +38,7 @@ def entity_id() -> str:
     req = urllib.request.Request(
         f"{AGENT_URL}/v1/entities", headers={"Authorization": f"Bearer {TOKEN}"}
     )
-    return json.loads(urllib.request.urlopen(req).read())["entities"][0]["id"]
+    return json.loads(urllib.request.urlopen(req).read())["entities"][0]["id"]  # nosec B310 - AGENT_URL scheme validated above
 
 
 def ask(eid: str, prompt: str) -> str:

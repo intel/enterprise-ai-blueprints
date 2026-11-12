@@ -1,43 +1,81 @@
-# Agentic AI Stack — Endpoints Reference
+# Intel® Agent Toolkit — Endpoints Reference
 
-This document lists every service endpoint exposed by the Agentic AI Stack
-and shows how to discover them dynamically after deployment.
+This document lists every service endpoint exposed by **Intel® Agent Toolkit** and
+**Intel® Inference Toolkit** (installed by Toolkit Manager release-1.2) that the blueprints consume, and
+shows how to discover them after deployment.
 
-All use cases in this repo consume these endpoints.
+All use cases in this repo consume these endpoints. `<base>` below is the
+`base_domain_name` from `env/<env>/global_config.yaml` (default `solutions.ai`) —
+the same value the deploy scripts call `CLUSTER_URL`.
 
 ---
 
 ## Quick Reference
 
-| Service | In-cluster URL | External URL (pattern) |
+| Service | In-cluster URL | External URL (via `eg-gateway`) |
 |---|---|---|
-| **GenAI Gateway (LiteLLM)** | `http://genai-gateway-service.genai-gateway.svc.cluster.local:4000` | `https://api.<domain>` |
-| **Langfuse (LLM Traces)** | `http://genai-gateway-trace-web.genai-gateway.svc.cluster.local:3000` | `https://trace-api.<domain>` |
+| **LiteLLM** (Inference Toolkit) | `http://litellm.litellm.svc.cluster.local:4000/v1` | `https://litellm.<base>/v1` |
+| **Langfuse (LLM Traces)** | `http://langfuse-web.langfuse.svc.cluster.local:3000` | `https://langfuse.<base>` |
 | **Redis** | `redis://default:<password>@redis-stack-server.redis.svc.cluster.local:6379` *(auth required)* | *(in-cluster only)* |
 | **Agent Sandbox Router** | `http://sandbox-router-svc.agent-sandbox-system.svc.cluster.local:8080` | *(in-cluster only)* |
-| **Grafana** | `http://grafana.observability.svc.cluster.local:3000` | `https://grafana.<domain>` *(if exposed)* |
-| **Prometheus** | `http://prometheus.observability.svc.cluster.local:9090` | *(in-cluster only)* |
-| **Coding Agent** | `http://coding-agent.coding-agent-maf.svc.cluster.local:8090` | `https://coding-agent.<domain>` |
+| **Grafana** | namespace `monitoring` | `https://grafana.<base>` |
+| **OTel Collector** | `opentelemetry-collector.monitoring.svc.cluster.local:4317` (gRPC) / `:4318` (HTTP) | *(in-cluster only)* |
+| **Coding Agent** | `http://coding-agent.coding-agent-maf.svc.cluster.local:8090` | `https://coding-agent.<base>` |
+| **Banking Assistant** | `http://banking-assistant.banking-assistant.svc.cluster.local:8090` | `https://banking-assistant.<base>` |
+| **Coding Agent (LangGraph)** | `http://coding-agent-langgraph.coding-agent.svc.cluster.local:8090` | `https://coding-agent-langgraph.<base>` |
+| **Customer Support Agent** | `http://customer-support-agent.customer-support-agent.svc.cluster.local:8501` (UI) / `:8502` (API) | `https://customer-support-agent.<base>` (`/api`, `/v1` → API; `/` → UI) |
+| **Deep Research Agent** | `http://deep-research-agent.deep-research-agent.svc.cluster.local:8081` (dashboard `:8082`) | `https://deep-research-agent.<base>` (optional `https://deep-research-agent-dashboard.<base>`) |
+
+Reserved platform hostnames (do not reuse for a blueprint): `inference.<base>`,
+`keycloak.<base>`, `grafana.<base>`.
 
 ---
 
 ## How to Discover Endpoints
 
-### All ingress hostnames
+### External hostnames (HTTPRoutes)
+
+Everything external is an **HTTPRoute** attached to
+the Envoy Gateway `eg-gateway` (namespace `envoy-gateway-system`, listener
+`https` for `*.<base>`, TLS terminated at the gateway with the wildcard secret
+`gateway-tls`):
 
 ```bash
-kubectl get ingress -A
+kubectl get httproute -A
 ```
 
 Example output:
 ```
-NAMESPACE        NAME             CLASS   HOSTS                          ADDRESS        PORTS
-genai-gateway    litellm-ingress  nginx   api.example.com                <node-ip>      443
-genai-gateway    langfuse-ingress nginx   trace-api.example.com          <node-ip>      443
-coding-agent     coding-agent-ing nginx   coding-agent.example.com       <node-ip>      443
+NAMESPACE           NAME                HOSTNAMES                           AGE
+litellm             litellm             ["litellm.solutions.ai"]            2d
+langfuse            langfuse            ["langfuse.solutions.ai"]           2d
+coding-agent-maf    coding-agent        ["coding-agent.solutions.ai"]       1h
+banking-assistant   banking-assistant   ["banking-assistant.solutions.ai"]  1h
 ```
 
----
+### Gateway IP, /etc/hosts and CA
+
+```bash
+kubectl get svc -n envoy-gateway-system \
+  -l gateway.envoyproxy.io/owning-gateway-name=eg-gateway
+```
+
+Add the hostnames you need to `/etc/hosts`:
+
+```
+<gateway-ip> coding-agent.<base> banking-assistant.<base> litellm.<base> langfuse.<base>
+```
+
+The gateway certificate is self-signed by default; its CA is exported by the
+installer to `env/local/logs/ai-solutions-ca.crt`. Use
+`curl --cacert env/local/logs/ai-solutions-ca.crt …` (or `curl -k`).
+
+> **Gateway auth.** `eg-gateway` carries a gateway-wide SecurityPolicy
+> `gateway-auth` (extAuth → LiteLLM `/key/verify`), so every route requires a
+> LiteLLM key **unless** the app ships its own (empty) route-level
+> SecurityPolicy. The blueprint charts do (`httpRoute.bypassGatewayAuth: true`)
+> so browsers can open them; each app then relies on its own auth
+> (`DEVUI_AUTH_TOKEN`, deep-research `API_KEYS`; customer-support has none).
 
 ### All cluster services
 
@@ -47,54 +85,69 @@ kubectl get svc -A
 
 ---
 
-## GenAI Gateway (LiteLLM)
+## LiteLLM
 
-The GenAI Gateway is the central LLM routing layer. All use cases talk to it
-using the OpenAI-compatible API.
+LiteLLM is the central LLM routing layer, installed by **Intel® Inference Toolkit**.
+All use cases talk to it using the OpenAI-compatible API. It already sends traces
+to Langfuse via callbacks, and the `content_safety` guardrail is on by default.
+
+> **Mesh access.** LiteLLM is guarded by the Istio AuthorizationPolicy
+> `litellm-ingress` (ns `litellm`). A blueprint namespace must be listed in
+> `litellm_allowed_namespaces` in `env/<env>/config.agent-toolkit.yaml` (then
+> re-run `./es_auto_installer.sh install agent-toolkit`) and be labelled
+> `istio.io/dataplane-mode=ambient` (deploy.sh does the label). See
+> [toolkit-manager-setup.md](toolkit-manager-setup.md#allow-the-blueprint-namespaces-to-reach-litellm).
 
 ### Endpoints
 
 | Path | Method | Description |
 |---|---|---|
-| `/health` | GET | Liveness check |
+| `/health/liveliness` | GET | Liveness check |
 | `/v1/models` | GET | List all registered models |
 | `/v1/chat/completions` | POST | OpenAI-compatible chat |
 | `/v1/completions` | POST | Legacy completions |
 | `/v1/embeddings` | POST | Text embeddings |
+| `/key/generate` | POST | Create a virtual key (master key required) |
 
-### Retrieve the API key
-
-The master key location depends on how your toolkit rendered the gateway. Try
-the deployment env first (works when the key is set inline), then fall back to a
-secret:
+### Retrieve the master key
 
 ```bash
-# Inline env (common):
-kubectl get deploy -n genai-gateway genai-gateway-deployment \
-  -o jsonpath='{range .spec.template.spec.containers[0].env[?(@.name=="LITELLM_MASTER_KEY")]}{.value}{end}' && echo
+kubectl get secret litellm-master-key -n litellm \
+  -o jsonpath='{.data.master_key}' | base64 -d && echo
+```
 
-# …or from a secret, if your install uses one (name/key may vary):
-kubectl get secret -n genai-gateway -o name | grep -i litellm
+The LiteLLM UI (`https://litellm.<base>/ui`) logs in as `admin` with this key.
+
+### Create a virtual key (recommended for blueprints)
+
+```bash
+curl -k https://litellm.<base>/key/generate \
+  -H "Authorization: Bearer <master_key>" \
+  -H 'Content-Type: application/json' \
+  -d '{"models":["qwen2-5-coder-14b"]}'
 ```
 
 ### List available models
 
 ```bash
-curl -sk https://api.example.com/v1/models \
+curl -sk https://litellm.<base>/v1/models \
   -H "Authorization: Bearer <api-key>" | python3 -m json.tool
 ```
+
+The default model id is `qwen2-5-coder-14b` (plus `hybrid-router` when
+`hybrid_router_enabled`).
 
 ### Test a chat completion
 
 ```bash
-API_KEY=$(kubectl get deploy -n genai-gateway genai-gateway-deployment \
-  -o jsonpath='{range .spec.template.spec.containers[0].env[?(@.name=="LITELLM_MASTER_KEY")]}{.value}{end}')
+API_KEY=$(kubectl get secret litellm-master-key -n litellm \
+  -o jsonpath='{.data.master_key}' | base64 -d)
 
-curl -sk https://api.example.com/v1/chat/completions \
+curl -sk https://litellm.<base>/v1/chat/completions \
   -H "Authorization: Bearer ${API_KEY}" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "Qwen/Qwen3-Coder-30B-A3B-Instruct",
+    "model": "qwen2-5-coder-14b",
     "messages": [{"role": "user", "content": "Hello!"}],
     "max_tokens": 64
   }' | python3 -m json.tool
@@ -103,15 +156,16 @@ curl -sk https://api.example.com/v1/chat/completions \
 ### URLs
 
 ```
-In-cluster (use for OPENAI_BASE_URL): http://genai-gateway-service.genai-gateway.svc.cluster.local:4000/v1
-External:                             https://api.<your-cluster-url>/v1
+In-cluster (use for OPENAI_BASE_URL): http://litellm.litellm.svc.cluster.local:4000/v1
+External:                             https://litellm.<base>/v1
 ```
 
 ---
 
 ## Redis
 
-Redis Stack is deployed in the `redis` namespace and used by agents for:
+Redis Stack is deployed in the `redis` namespace (`redis_stack_enabled`) and used
+by agents for:
 - Session state persistence
 - Conversation history (RediSearch vector index)
 - Cross-request context continuity
@@ -144,7 +198,7 @@ kubectl exec -n redis statefulset/redis-stack-server -- redis-cli -a "$PW" ping
 
 ```bash
 kubectl port-forward -n redis svc/redis-stack-server 6379:6379 &
-redis-cli ping
+redis-cli -a "$PW" ping
 ```
 
 ---
@@ -157,8 +211,10 @@ ClusterIP service.
 
 ### In-cluster URL
 
-The controller/router install into the **`agent-sandbox-system`** namespace by
-default (kubernetes-sigs/agent-sandbox). Verify with `kubectl get sandboxtemplate,sandboxwarmpool -A`.
+The controller (v0.5.0, CRDs `extensions.agents.x-k8s.io/v1beta1`) and router
+install into the **`agent-sandbox-system`** namespace (`agent_sandbox_enabled`),
+with the `python-sandbox-template` SandboxTemplate and the `python-pool` warm pool
+(size 5). Verify with `kubectl get sandboxtemplate,sandboxwarmpool -A`.
 
 ```
 http://sandbox-router-svc.agent-sandbox-system.svc.cluster.local:8080
@@ -177,6 +233,14 @@ kubectl get secret -n agent-sandbox-system sandbox-router-auth \
 
 The coding-agent consumes this as `SANDBOX_ROUTER_TOKEN` (its `deploy.sh`
 auto-discovers it).
+
+### Sandbox network policy
+
+The NetworkPolicy `eat-sandbox-pool-egress` restricts sandbox pods: they accept
+ingress **only from the router**, and egress goes **to public IPs only** — no
+in-cluster services and no proxy. Code run in the sandbox therefore cannot call
+LiteLLM or Redis, and `pip install` inside the sandbox needs direct internet
+access.
 
 ### Verify the router is up
 
@@ -200,45 +264,44 @@ locally against a remote cluster.
 ## Langfuse (LLM Observability Traces)
 
 Langfuse captures every LLM call, token count, latency, and agent step. It is
-**optional** — the blueprints deploy and run without it.
+installed by **Intel® Inference Toolkit**, and LiteLLM already sends its own traces to
+it. It is **optional** for the blueprints — they deploy and run without it.
 
 ### URLs
 
 ```
-In-cluster : http://genai-gateway-trace-web.genai-gateway.svc.cluster.local:3000
-External   : https://trace-api.<your-cluster-url>
+In-cluster : http://langfuse-web.langfuse.svc.cluster.local:3000
+External   : https://langfuse.<base>
 ```
 
 ### Retrieve API keys
 
-The keys are set inline on the gateway deployment (there is no `langfuse-secret`):
+The seeded project's keys are in the Secret `langfuse-secrets` (ns `langfuse`):
 
 ```bash
-# Public key
-kubectl get deploy -n genai-gateway genai-gateway-deployment \
-  -o jsonpath='{range .spec.template.spec.containers[0].env[?(@.name=="LANGFUSE_PUBLIC_KEY")]}{.value}{end}' && echo
+# Public key (pk-lf-…)
+kubectl get secret langfuse-secrets -n langfuse \
+  -o jsonpath='{.data.public_key}' | base64 -d && echo
 
-# Secret key
-kubectl get deploy -n genai-gateway genai-gateway-deployment \
-  -o jsonpath='{range .spec.template.spec.containers[0].env[?(@.name=="LANGFUSE_SECRET_KEY")]}{.value}{end}' && echo
+# Secret key (sk-lf-…)
+kubectl get secret langfuse-secrets -n langfuse \
+  -o jsonpath='{.data.secret_key}' | base64 -d && echo
 ```
+
+`deploy.sh` auto-discovers these when `LANGFUSE_PUBLIC_KEY`/`LANGFUSE_SECRET_KEY`
+are unset. The same Secret also holds `project_id`.
 
 ### UI login (initial admin user)
 
-Self-signup is disabled; log in with the initial admin user set on the
-`genai-gateway-trace-web` deployment:
+Self-signup is disabled; log in with the initial admin user from the same Secret:
 
 ```bash
-# Email (username)
-kubectl get deploy -n genai-gateway genai-gateway-trace-web \
-  -o jsonpath='{range .spec.template.spec.containers[0].env[?(@.name=="LANGFUSE_INIT_USER_EMAIL")]}{.value}{end}' && echo
-
-# Password
-kubectl get deploy -n genai-gateway genai-gateway-trace-web \
-  -o jsonpath='{range .spec.template.spec.containers[0].env[?(@.name=="LANGFUSE_INIT_USER_PASSWORD")]}{.value}{end}' && echo
+kubectl get secret langfuse-secrets -n langfuse -o jsonpath='{.data.admin_email}'    | base64 -d && echo
+kubectl get secret langfuse-secrets -n langfuse -o jsonpath='{.data.admin_password}' | base64 -d && echo
 ```
 
-Open the UI: `kubectl port-forward -n genai-gateway svc/genai-gateway-trace-web 3000:3000` → `http://localhost:3000`.
+Open the UI at `https://langfuse.<base>`, or
+`kubectl port-forward -n langfuse svc/langfuse-web 3000:3000` → `http://localhost:3000`.
 
 ### Configure tracing in use cases
 
@@ -247,7 +310,7 @@ Set these env vars (via Helm values or `.env`):
 ```bash
 LANGFUSE_PUBLIC_KEY=pk-lf-xxxx
 LANGFUSE_SECRET_KEY=sk-lf-xxxx
-LANGFUSE_HOST=https://trace-api.example.com
+LANGFUSE_HOST=http://langfuse-web.langfuse.svc.cluster.local:3000
 ```
 
 ---
@@ -255,21 +318,16 @@ LANGFUSE_HOST=https://trace-api.example.com
 ## Grafana (Metrics & Dashboards)
 
 Grafana provides real-time dashboards for infrastructure metrics, model
-throughput, latency, and token usage.
+throughput, latency, and token usage. It runs in the `monitoring` namespace and
+is exposed at `https://grafana.<base>`. The platform's OpenTelemetry collector is
+`opentelemetry-collector.monitoring.svc.cluster.local` (`4317` gRPC, `4318` HTTP).
 
 ### Retrieve credentials
 
 ```bash
-# Default admin password
-kubectl get secret -n observability grafana-admin-secret \
-  -o jsonpath='{.data.admin-password}' | base64 -d && echo
-```
-
-### Port-forward for local access
-
-```bash
-kubectl port-forward -n observability svc/grafana 3000:3000
-# Open: http://localhost:3000  (admin / <password above>)
+# Admin user / password
+kubectl get secret observability-credentials -n monitoring -o jsonpath='{.data.grafanaAdminUser}' | base64 -d; echo
+kubectl get secret observability-credentials -n monitoring -o jsonpath='{.data.grafanaAdminPassword}' | base64 -d; echo
 ```
 
 ---
@@ -294,13 +352,13 @@ Responses API** (not `/v1/chat/completions`). All non-health routes require
 ### External URL (after deploy)
 
 ```
-https://coding-agent.<your-cluster-url>
+https://coding-agent.<base>
 ```
 
 ### Test after deploy
 
 ```bash
-AGENT=https://coding-agent.api.example.com
+AGENT=https://coding-agent.solutions.ai
 TOKEN=<DEVUI_AUTH_TOKEN printed by deploy.sh>
 
 # Health (no auth)
@@ -325,13 +383,32 @@ http://coding-agent.coding-agent-maf.svc.cluster.local:8090
 
 ---
 
+## Blueprints
+
+Endpoints of the other blueprints in this repo. See each use case's README for
+the full API.
+
+| Blueprint | Namespace / Service | External host | Auth | Key endpoints |
+|---|---|---|---|---|
+| Coding Agent (LangGraph) | `coding-agent` / `coding-agent-langgraph:8090` | `coding-agent-langgraph.<base>` | `Authorization: Bearer <DEVUI_AUTH_TOKEN>` on `/v1/*` | `GET /health`, `GET /v1/entities`, `POST /v1/chat/completions`, `POST /v1/responses` |
+| Customer Support Agent | `customer-support-agent` / `customer-support-agent:8501,8502` | `customer-support-agent.<base>` | **none** (demo data only) | `GET /api/v1/health`, `POST /api/v1/chat`, `GET /api/v1/tools`, `POST /v1/chat/completions`; Streamlit UI at `/` |
+| Deep Research Agent | `deep-research-agent` / `deep-research-agent:8081` (`:8082` dashboard) | `deep-research-agent.<base>`, `deep-research-agent-dashboard.<base>` | optional `X-API-Key` on `/api/*` (`API_KEYS`) | `GET /health`, `POST /api/research`, `GET /api/research/{id}/stream` (SSE), `GET /api/research/{id}` |
+
+All three routes ship the empty route-level SecurityPolicy
+(`httpRoute.bypassGatewayAuth: true`), and their namespaces must be listed in
+`litellm_allowed_namespaces`. `customer-support-agent` additionally uses Redis
+and the `bge-base-en` embedding model (add it to `llm_services_autodeploy_models`);
+`deep-research-agent` needs `TAVILY_API_KEY` and internet egress.
+
+---
+
 ## Port-Forward Cheatsheet
 
 Useful when testing locally against a remote cluster:
 
 ```bash
-# GenAI Gateway (LiteLLM)
-kubectl port-forward -n genai-gateway svc/genai-gateway-service 4000:4000 &
+# LiteLLM
+kubectl port-forward -n litellm svc/litellm 4000:4000 &
 
 # Redis
 kubectl port-forward -n redis svc/redis-stack-server 6379:6379 &
@@ -342,24 +419,40 @@ kubectl port-forward -n agent-sandbox-system svc/sandbox-router-svc 8080:8080 &
 # Coding Agent
 kubectl port-forward -n coding-agent-maf svc/coding-agent 8090:8090 &
 
-# Grafana
-kubectl port-forward -n observability svc/grafana 3000:3000 &
+# Banking Assistant
+kubectl port-forward -n banking-assistant svc/banking-assistant 8091:8090 &
+
+# Coding Agent (LangGraph)
+kubectl port-forward -n coding-agent svc/coding-agent-langgraph 8092:8090 &
+
+# Customer Support Agent (Streamlit UI, FastAPI)
+kubectl port-forward -n customer-support-agent svc/customer-support-agent 8501:8501 8502:8502 &
+
+# Deep Research Agent
+kubectl port-forward -n deep-research-agent svc/deep-research-agent 8081:8081 &
 
 # Langfuse
-kubectl port-forward -n genai-gateway svc/genai-gateway-trace-web 3001:3000 &
+kubectl port-forward -n langfuse svc/langfuse-web 3000:3000 &
 ```
+
+Grafana is easiest via `https://grafana.<base>`.
 
 ---
 
 ## Environment Variable Summary
 
-A ready-to-copy `.env` snippet for use cases connecting to a running stack:
+A ready-to-copy `.env` snippet for use cases connecting to a running platform.
+In Kubernetes mode `deploy.sh` auto-discovers everything except `MODEL_NAME`
+when left empty:
 
 ```bash
-# GenAI Gateway  (external: https://api.<domain>/v1)
-OPENAI_BASE_URL=http://genai-gateway-service.genai-gateway.svc.cluster.local:4000/v1
-OPENAI_API_KEY=<litellm-master-key>
-MODEL_NAME=Qwen/Qwen2.5-Coder-14B-Instruct   # must match a model from /v1/models
+# Base domain (Toolkit Manager base_domain_name; auto-discovered from eg-gateway)
+CLUSTER_URL=solutions.ai
+
+# LiteLLM  (external: https://litellm.<base>/v1)
+OPENAI_BASE_URL=http://litellm.litellm.svc.cluster.local:4000/v1
+OPENAI_API_KEY=<litellm-virtual-key>   # falls back to litellm-master-key if empty
+MODEL_NAME=qwen2-5-coder-14b           # must match a model from /v1/models
 
 # Redis (authenticated — includes user:password)
 REDIS_URL=redis://default:<password>@redis-stack-server.redis.svc.cluster.local:6379
@@ -371,8 +464,8 @@ SANDBOX_NAMESPACE=agent-sandbox-system
 SANDBOX_WARMPOOL=python-pool
 SANDBOX_TEMPLATE=python-sandbox-template
 
-# Observability (optional)  (external: https://trace-api.<domain>)
+# Observability (optional)  (external: https://langfuse.<base>)
 LANGFUSE_PUBLIC_KEY=pk-lf-xxxx
 LANGFUSE_SECRET_KEY=sk-lf-xxxx
-LANGFUSE_HOST=http://genai-gateway-trace-web.genai-gateway.svc.cluster.local:3000
+LANGFUSE_HOST=http://langfuse-web.langfuse.svc.cluster.local:3000
 ```

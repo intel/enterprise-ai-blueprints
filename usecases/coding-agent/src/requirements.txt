@@ -1,0 +1,39 @@
+# LangGraph Agent Framework
+langgraph>=0.4.0
+langchain-core>=0.3.0
+langchain-openai>=0.3.0
+
+# OpenAI (for OpenAI-compatible chat completions)
+openai>=1.0.0
+
+# Redis for persistent memory / checkpointing
+redis>=5.0.0
+redisvl>=0.1.0
+
+# Agent Sandbox — isolated code execution in Kubernetes sandbox pods
+k8s-agent-sandbox==0.4.6
+# Pin kubernetes client to 35.x — v36.0.0 has a bug where load_incluster_config()
+# stores the bearer token under api_key['authorization'] but auth_settings() looks
+# for api_key['BearerToken'], so requests go out as system:anonymous inside a pod.
+kubernetes>=35.0.0,<36
+
+# Ray — distributed parallel task execution (optional; only used when
+# RAY_ENABLED=true, otherwise the agent falls back to sequential execution).
+# Pinned to 2.56.x (~=) to patch CVE-2025-62593, CVE-2026-57516 and the other
+# 2025/2026 Ray advisories. When RAY_ENABLED=true the KubeRay cluster image must
+# match this client version: set kuberay_ray_image in config.agent-toolkit.yaml
+# to rayproject/ray:2.56.0-py312 (the agent-toolkit default is 2.40.0).
+ray[default]~=2.56.0
+# aiohttp is pulled in transitively by ray[default]; pin the patched release
+# (CVE-2025/CVE-2026 aiohttp advisories are fixed in 3.14.3; ray needs >=3.13.3).
+aiohttp>=3.14.3
+
+# Observability
+langfuse>=4.6.0
+
+# Utilities
+python-dotenv>=1.0.0
+
+# Web server for API endpoints
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0

@@ -1,0 +1,85 @@
+###############################################################################
+# Default values for customer-support-agent Helm chart
+###############################################################################
+
+agent:
+  image:
+    repository: customer-support-agent
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  replicaCount: 1
+
+  # LLM configuration
+  llmBaseUrl: "http://litellm.litellm.svc.cluster.local:4000/v1"   # Intel Inference Toolkit LiteLLM
+  llmApiKey: ""               # REQUIRED – LiteLLM key (deploy.sh discovers the master key)
+  llmModel: "qwen2-5-coder-14b"
+
+  # Long-term semantic memory: RediSearch vector store (agent-toolkit redis-stack)
+  # with embeddings served by LiteLLM. Fail-open if unavailable.
+  memory:
+    enabled: true
+    # The shared Redis requires auth — deploy.sh reads the full URL from the
+    # redis-stack-server-credentials secret (key REDIS_URL).
+    redisUrl: "redis://redis-stack-server.redis.svc.cluster.local:6379/0"
+    index: "csa_mem_idx"
+    topK: 4
+    # Inference Toolkit catalog name for BAAI/bge-base-en-v1.5 — add "bge-base-en" to
+    # llm_services_autodeploy_models in config.agent-toolkit.yaml to serve it.
+    embeddingModel: "bge-base-en"
+    embeddingDims: 768
+
+  # Parallel tool execution. executor: "local" (ThreadPool) or "ray" (KubeRay).
+  parallel:
+    executor: "local"
+    maxParallel: 8
+    rayAddress: "ray://ray-cluster-head-svc.ray-system:10001"   # needs kuberay_enabled: true
+    # In-cluster URL Ray tasks call back to; empty = derived from release/namespace.
+    selfApiUrl: ""
+
+  # Application ports
+  apiPort: 8502
+  streamlitPort: 8501
+
+  # Resource requests and limits
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: "2"
+      memory: 2Gi
+
+  # Pin the pod to a node (used when the image is only present on one node's
+  # containerd, e.g. built locally with nerdctl). Empty = schedule anywhere.
+  nodeSelector: {}
+
+  # Scratch storage for the SQLite demo DB (reseeded deterministically on start).
+  dataDir: /app/data
+
+# Service exposure. type: ClusterIP (default), NodePort, or LoadBalancer.
+# When type=NodePort, optionally pin the ports (must be in 30000-32767).
+service:
+  type: ClusterIP
+  streamlitNodePort: ""
+  apiNodePort: ""
+
+# ---------------------------------------------------------------------------
+# HTTPRoute (Envoy Gateway / Gateway API)
+# The platform exposes services through the shared Envoy Gateway 'eg-gateway'
+# (namespace envoy-gateway-system); TLS is terminated there with the wildcard
+# *.<base_domain_name> certificate, so the chart needs no TLS secret.
+# Routing: /api and /v1 → FastAPI (apiPort), everything else → Streamlit UI.
+# ---------------------------------------------------------------------------
+httpRoute:
+  enabled: false
+  host: ""            # e.g. customer-support-agent.solutions.ai
+  timeout: ""         # request timeout, e.g. "900s"; empty = gateway default (600s)
+  gateway:
+    name: eg-gateway
+    namespace: envoy-gateway-system
+    sectionName: https
+  # The gateway-wide SecurityPolicy validates a LiteLLM key on every request;
+  # browsers can't send one, so by default the chart opts this route out.
+  # NOTE: this blueprint has no user authentication of its own (demo data only).
+  bypassGatewayAuth: true

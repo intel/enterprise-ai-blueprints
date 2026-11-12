@@ -1,0 +1,53 @@
+###############################################################################
+# Docker Compose — Local development stack for Customer Support Agent
+#
+# Runs the agent (Streamlit UI + FastAPI) + redis-stack (memory) without
+# Kubernetes. Set LITELLM_URL and LITELLM_API_KEY to point at your LiteLLM
+# gateway — on a Toolkit Manager stack that is https://litellm.<base_domain_name>/v1 with a
+# LiteLLM (virtual or master) key; the host must resolve to the eg-gateway IP
+# and trust its CA (env/<env>/logs/ai-solutions-ca.crt).
+#
+# Usage:
+#   export LITELLM_URL=https://litellm.solutions.ai/v1
+#   export LITELLM_API_KEY=sk-your-key
+#   export MODEL_NAME=qwen2-5-coder-14b
+#   docker compose up --build -d   # or: ../../deploy-usecase.sh customer-support-agent --mode docker
+###############################################################################
+
+services:
+  customer-support-agent:
+    build:
+      context: ./src
+      dockerfile: Dockerfile
+    container_name: customer-support-agent
+    ports:
+      - "8501:8501"   # Streamlit UI
+      - "8502:8502"   # FastAPI API
+    env_file:
+      - ./config/agent-config.env
+    environment:
+      LLM_BASE_URL: "${LITELLM_URL:-http://host.docker.internal:4000/v1}"
+      LLM_API_KEY: "${LITELLM_API_KEY:-sk-placeholder}"
+      LLM_MODEL: "${MODEL_NAME:-qwen2-5-coder-14b}"
+      REDIS_URL: "redis://redis-stack:6379/0"
+    depends_on:
+      redis-stack:
+        condition: service_healthy
+    restart: unless-stopped
+
+  redis-stack:
+    image: redis/redis-stack-server:7.4.0-v8
+    container_name: customer-support-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  redis-data:

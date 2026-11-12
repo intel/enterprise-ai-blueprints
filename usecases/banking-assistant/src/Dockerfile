@@ -1,5 +1,6 @@
 FROM python:3.12-slim
-RUN groupadd -r agentuser && useradd -r -g agentuser -d /app agentuser
+# Numeric UID/GID 10001 so runAsNonRoot can be verified (PSS restricted).
+RUN groupadd -r -g 10001 agentuser && useradd -r -u 10001 -g agentuser -d /app agentuser
 
 WORKDIR /app
 
@@ -16,6 +17,7 @@ COPY requirements.txt .
 # apt-get upgrade patches base-image OS packages flagged by the image scan
 # (perl-base, gzip, libpcre2-8, libsqlite3, ...) to their fixed Debian versions.
 RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/* \
+    && pip install --no-cache-dir --upgrade "pip>=26.2" \
     && pip install --no-cache-dir -r requirements.txt
 
 # Copy application

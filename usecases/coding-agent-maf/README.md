@@ -7,9 +7,9 @@ Code execution runs in isolated **Kubernetes sandbox pods** managed by the
 each agent session gets its own sandbox pod, keeping installed packages and
 defined variables alive across tool calls.
 
-This use case runs on top of the
-[Agentic AI Stack](https://github.com/intel/enterprise-agent-toolkit)
-infrastructure.
+This use case runs on top of
+[Intel® Agent Toolkit](https://github.com/intel/enterprise-agent-toolkit/tree/release-2.0.0),
+installed and operated by [Toolkit Manager](https://github.com/intel/enterprise-ai-solutions/tree/release-1.2).
 
 ---
 
@@ -35,20 +35,29 @@ infrastructure.
 
 ```
 User / Browser (DevUI)
-        │
+        │  https://coding-agent.<base_domain_name>
+        ▼
+Envoy Gateway eg-gateway ──HTTPRoute──┐
+  (envoy-gateway-system ns)           │
+        ┌─────────────────────────────┘
         ▼
 Coding Agent Pod  ──(cluster DNS)──▶  sandbox-router-svc  ──▶  Sandbox Pod
-  (coding-agent ns)                 (agent-sandbox-system ns)      (ephemeral)
-        │
+  (coding-agent-maf ns)             (agent-sandbox-system ns)      (ephemeral,
+        │                                                       public egress only)
         ▼
-GenAI Gateway (LiteLLM)           Redis (memory)
-  (genai-gateway ns)               (redis ns)
+LiteLLM                           Redis (memory)
+  (litellm ns)                     (redis ns)
 ```
 
-- The coding agent talks to the **GenAI Gateway** for all LLM inference.
+- The coding agent talks to **LiteLLM** (Intel® Inference Toolkit) for all LLM
+  inference. The `coding-agent-maf` namespace is in the Istio ambient mesh and
+  must be listed in `litellm_allowed_namespaces`.
 - The coding agent calls the **sandbox-router** over in-cluster DNS — no
   port-forward or extra RBAC needed on the coding-agent pod.
 - The sandbox-router owns all Kubernetes API interactions (create/delete SandboxClaims).
+- Sandbox pods (NetworkPolicy `eat-sandbox-pool-egress`) accept traffic only from
+  the router and can reach public IPs only — code run there cannot call LiteLLM or
+  Redis, and `install_package` needs direct internet access from the sandbox.
 - Each session reuses one sandbox pod — state (installed packages, defined variables,
   `/tmp` files) persists across `execute_python_code` and `install_package` calls.
   Call `reset_sandbox()` to start fresh.
@@ -57,22 +66,23 @@ GenAI Gateway (LiteLLM)           Redis (memory)
 
 ## Prerequisites
 
-The following stack components must be running **before** deploying this use case.
-See the [Agentic AI Stack setup guide](../../docs/agentic-stack-setup.md) or the
-[infrastructure repo README](https://github.com/intel/enterprise-agent-toolkit).
+The following Intel® Agent Toolkit components must be running **before** deploying this
+use case. See the [Toolkit Manager setup guide](../../docs/toolkit-manager-setup.md).
 
-| Component | Namespace | Config flag |
+| Component | Namespace | Switch (`env/<env>/config.agent-toolkit.yaml`) |
 |---|---|---|
-| Kubernetes | — | `deploy_kubernetes_fresh=on` |
-| GenAI Gateway (LiteLLM) | `genai-gateway` | `deploy_genai_gateway=on` |
-| Redis Stack | `redis` | `deploy_redis=on` |
-| Agent Sandbox controller + router | `agent-sandbox-system` | `deploy_agent_sandbox=on` |
-| LLM model | `llm-model-*` | `deploy_llm_models=on`, `models=cpu-qwen3-coder-30b` |
+| Kubernetes, Istio, Envoy Gateway | — / `envoy-gateway-system` | installed by `./es_auto_installer.sh install agent-toolkit` |
+| LiteLLM | `litellm` | always installed by Intel® Inference Toolkit |
+| Redis Stack | `redis` | `redis_stack_enabled` |
+| Agent Sandbox controller + router | `agent-sandbox-system` | `agent_sandbox_enabled` |
+| LLM model | — | `llm_services_autodeploy_models` (default `["qwen2-5-coder-14b"]`) |
+| LiteLLM access from this namespace | — | add `coding-agent-maf` to `litellm_allowed_namespaces` |
 
 Verify all prerequisites are up:
 
 ```bash
-kubectl get pods -n genai-gateway
+./es_auto_installer.sh validate agent-toolkit     # from the enterprise-ai-solutions checkout
+kubectl get pods -n litellm
 kubectl get pods -n redis
 kubectl get pods -n agent-sandbox-system
 ```
@@ -97,26 +107,36 @@ cd usecases/coding-agent-maf
 
 Both scripts build the image (into the containerd `k8s.io` namespace via
 `nerdctl`), prompt for your stack details, and deploy via Helm. They
-auto-discover the authenticated Redis URL and the sandbox-router auth token from
-the toolkit's secrets.
+auto-discover the base domain, LiteLLM URL and key, the authenticated Redis URL,
+the sandbox-router auth token and the Langfuse keys from the platform's secrets.
 
 **What the deploy does:**
 1. Builds the agent image (into the containerd `k8s.io` namespace via `nerdctl`)
-2. Creates the `coding-agent-maf` namespace
-3. Auto-discovers the model, authenticated Redis URL, and sandbox-router token
-4. Optionally installs a TLS secret from your cert/key files
+2. Creates the `coding-agent-maf` namespace and labels it
+   `istio.io/dataplane-mode=ambient` + Pod Security `restricted`; warns if it is
+   not in `litellm_allowed_namespaces` (opt-in `PATCH_LITELLM_AUTHZ=true` patches
+   the `litellm-ingress` policy directly as a stop-gap)
+3. Auto-discovers `CLUSTER_URL`, LiteLLM URL/key, authenticated Redis URL,
+   sandbox-router token and Langfuse keys (prompts for `MODEL_NAME`)
+4. Exposes the DevUI via an HTTPRoute on `eg-gateway` (TLS is terminated at the
+   gateway — no TLS secret needed)
 5. Runs `helm upgrade --install` with your configuration and waits for readiness
 6. Prints the access URL and the DevUI auth token
 
 **Expected output:**
 ```
-[OK]    Auto-discovered model: Qwen/Qwen2.5-Coder-14B-Instruct
 [OK]    Coding Agent deployed — namespace: coding-agent-maf
 
   Access the Coding Agent:
-    https://coding-agent.api.example.com      (or port-forward — see below)
+    https://coding-agent.solutions.ai      (or port-forward — see below)
     DevUI login token (enter in the browser login prompt): <token>
 ```
+
+To use the external URL, add `<eg-gateway-ip> coding-agent.<base_domain_name>` to
+`/etc/hosts` and trust `env/local/logs/ai-solutions-ca.crt` (or use `curl -k`) —
+see [toolkit-manager-setup.md](../../docs/toolkit-manager-setup.md#3-reach-the-gateway-hostnames--ca).
+The route ships an empty SecurityPolicy so the gateway does not demand a LiteLLM
+key; the DevUI token protects it instead.
 
 The agent's API is the OpenAI **Responses** API on port 8090 — see
 [API Reference](#api-reference).
@@ -153,9 +173,11 @@ router port-forwarded locally.
 # Port-forward the sandbox router from your cluster
 kubectl port-forward -n agent-sandbox-system svc/sandbox-router-svc 8080:8080 &
 
-# Set your LiteLLM URL and API key
-export LITELLM_URL=https://api.example.com/v1
-export LITELLM_API_KEY=sk-your-key
+# Set your LiteLLM URL and API key (a LiteLLM virtual key; trust the gateway CA or
+# expect TLS errors with the default self-signed certificate)
+export LITELLM_URL=https://litellm.solutions.ai/v1
+export LITELLM_API_KEY=sk-your-litellm-key
+export MODEL_NAME=qwen2-5-coder-14b
 export SANDBOX_ROUTER_URL=http://localhost:8080
 
 # Start the stack
@@ -172,9 +194,9 @@ The DevUI is available at **http://localhost:8090**.
 
 | Variable | Default | Description |
 |---|---|---|
-| `OPENAI_BASE_URL` | `http://genai-gateway-service.genai-gateway.svc.cluster.local:4000/v1` | LLM endpoint (LiteLLM / OpenAI-compatible) |
-| `OPENAI_API_KEY` | — | API key for the LLM endpoint (**required**) |
-| `MODEL_NAME` | — | Model ID registered in LiteLLM (**required**) |
+| `OPENAI_BASE_URL` | `http://litellm.litellm.svc.cluster.local:4000/v1` | LLM endpoint (LiteLLM / OpenAI-compatible); auto-discovered |
+| `OPENAI_API_KEY` | — | LiteLLM key (**required**; falls back to `litellm-master-key` — a virtual key is recommended) |
+| `MODEL_NAME` | — | Model ID registered in LiteLLM, e.g. `qwen2-5-coder-14b` (**required**) |
 | `REDIS_URL` | `redis://default:<password>@redis-stack-server.redis.svc.cluster.local:6379` | Redis for persistent memory. **Must include credentials** — the shared Redis requires auth (see [config.env](../../config.env)) |
 | `SANDBOX_ROUTER_URL` | `http://sandbox-router-svc.agent-sandbox-system.svc.cluster.local:8080` | Sandbox router in-cluster URL |
 | `SANDBOX_NAMESPACE` | `agent-sandbox-system` | Namespace where sandbox pods are created |
@@ -182,9 +204,10 @@ The DevUI is available at **http://localhost:8090**.
 | `SANDBOX_ROUTER_TOKEN` | — | Bearer token for the router when `ALLOW_UNAUTHENTICATED_ROUTER=false` |
 | `SANDBOX_TEMPLATE` | `python-sandbox-template` | SandboxTemplate name to use |
 | `WORKSPACE_DIR` | `/app/workspace` | Workspace volume mount path |
-| `LANGFUSE_PUBLIC_KEY` | — | Langfuse public key (optional — enables tracing) |
+| `CLUSTER_URL` | auto-discovered | Toolkit Manager `base_domain_name`; route host is `coding-agent.<CLUSTER_URL>` |
+| `LANGFUSE_PUBLIC_KEY` | auto-discovered | Langfuse public key (optional — enables tracing; from `langfuse-secrets`) |
 | `LANGFUSE_SECRET_KEY` | — | Langfuse secret key (optional) |
-| `LANGFUSE_HOST` | — | Langfuse URL (optional) — see [Observability guide](../../docs/observability-langfuse.md) |
+| `LANGFUSE_HOST` | `http://langfuse-web.langfuse.svc.cluster.local:3000` | Langfuse URL (optional) — see [Observability guide](../../docs/observability-langfuse.md) |
 | `DEVUI_AUTH_TOKEN` | — | Auth token for the DevUI web interface |
 | `AUTO_OPEN_BROWSER` | `true` | Set to `false` in containers |
 
@@ -192,9 +215,9 @@ The DevUI is available at **http://localhost:8090**.
 
 ```yaml
 agent:
-  modelName: "Qwen/Qwen2.5-Coder-14B-Instruct"     # required — must match /v1/models
-  openaiApiKey: "your-key"                            # required
-  openaiBaseUrl: "https://api.example.com/v1"
+  modelName: "qwen2-5-coder-14b"                    # required — must match /v1/models
+  openaiApiKey: "your-litellm-key"                    # required
+  openaiBaseUrl: "http://litellm.litellm.svc.cluster.local:4000/v1"
   devuiAuthToken: "your-token"                        # required for web UI
   sandboxNamespace: "agent-sandbox-system"
   sandboxTemplate: "python-sandbox-template"
@@ -205,12 +228,16 @@ agent:
 # Authenticated Redis URL (from redis-stack-server-credentials secret)
 redisUrl: "redis://default:<password>@redis-stack-server.redis.svc.cluster.local:6379"
 
-ingress:
+httpRoute:
   enabled: true
-  host: "coding-agent.api.example.com"
-  tls:
-    enabled: true
-    secretName: "coding-agent-tls"
+  host: "coding-agent.solutions.ai"                   # coding-agent.<base_domain_name>
+  gateway:
+    name: eg-gateway
+    namespace: envoy-gateway-system
+    sectionName: https
+  bypassGatewayAuth: true     # empty route-level SecurityPolicy; DevUI token protects the app
+
+affinity: {}                  # no node affinity required
 ```
 
 Full values reference: [`helm-chart/values.yaml`](helm-chart/values.yaml)
@@ -229,14 +256,14 @@ route). All routes except `/health` require `Authorization: Bearer <DEVUI_AUTH_T
 Liveness check (JSON, no auth).
 
 ```bash
-curl https://coding-agent.api.example.com/health
+curl -k https://coding-agent.solutions.ai/health
 # {"status":"healthy","entities_count":1,"framework":"agent_framework"}
 ```
 
 ### `GET /v1/entities` — list agent entities
 
 ```bash
-curl -s https://coding-agent.api.example.com/v1/entities \
+curl -s https://coding-agent.solutions.ai/v1/entities \
   -H "Authorization: Bearer $DEVUI_AUTH_TOKEN"
 ```
 
@@ -245,7 +272,7 @@ Grab the `entities[0].id` — you pass it as `metadata.entity_id` below.
 ### `POST /v1/responses` — run the agent (generate + execute code)
 
 ```bash
-AGENT=https://coding-agent.api.example.com
+AGENT=https://coding-agent.solutions.ai
 EID=$(curl -s "$AGENT/v1/entities" -H "Authorization: Bearer $DEVUI_AUTH_TOKEN" \
   | python3 -c "import sys,json;print(json.load(sys.stdin)['entities'][0]['id'])")
 
@@ -282,13 +309,13 @@ All clients take the DevUI token via `DEVUI_AUTH_TOKEN` (printed by `deploy.sh`)
 export DEVUI_AUTH_TOKEN=<token>
 
 # Python client (standard library only — no extra deps)
-python3 examples/generate_code.py https://coding-agent.api.example.com
+python3 examples/generate_code.py https://coding-agent.solutions.ai
 
 # curl-based examples
-bash examples/generate_code.sh https://coding-agent.api.example.com
+bash examples/generate_code.sh https://coding-agent.solutions.ai
 
 # OpenAI SDK usage (Responses API; needs: pip install "openai>=1.66")
-AGENT_URL=https://coding-agent.api.example.com python3 examples/openai_compat.py
+AGENT_URL=https://coding-agent.solutions.ai python3 examples/openai_compat.py
 ```
 
 ---
@@ -316,7 +343,8 @@ image your use case needs (e.g. Node.js, R), then set `SANDBOX_TEMPLATE` and
 sandbox creation.
 
 **Enable Ray** — set `ray.enabled=true` and provide a `ray.address` in
-`values.yaml` to enable distributed parallel task execution via KubeRay.
+`values.yaml` to enable distributed parallel task execution via KubeRay
+(requires `kuberay_enabled` in `config.agent-toolkit.yaml`; KubeRay runs in `ray-system`).
 
 ---
 
@@ -325,11 +353,15 @@ sandbox creation.
 | Symptom | Likely cause | Fix |
 |---|---|---|
 | Pod in `CrashLoopBackOff` | Missing `OPENAI_API_KEY` or `MODEL_NAME` | Check `kubectl describe pod -n coding-agent-maf` and verify Helm values |
-| `502 Bad Gateway` from ingress | Agent pod not ready yet | Wait 1–2 min; `kubectl logs -n coding-agent-maf -l app.kubernetes.io/name=coding-agent` |
-| Sandbox pod not creating | Agent Sandbox controller not running | `kubectl get pods -n agent-sandbox-system`; re-run stack deploy with `deploy_agent_sandbox=on` |
+| `502`/`503` from the gateway | Agent pod not ready yet | Wait 1–2 min; `kubectl logs -n coding-agent-maf -l app.kubernetes.io/name=coding-agent` |
+| Sandbox pod not creating | Agent Sandbox controller not running | `kubectl get pods -n agent-sandbox-system`; set `agent_sandbox_enabled` in `config.agent-toolkit.yaml` and re-run `./es_auto_installer.sh install agent-toolkit` |
 | Redis connection refused | Redis not deployed or wrong URL | `kubectl get pods -n redis`; verify `REDIS_URL` value |
 | `Syntax error` from Redis search | Special chars in query | This is handled automatically by the `SanitizedRedisContextProvider` in `agent.py` |
-| Model not found in LiteLLM | `MODEL_NAME` not registered | List models: `curl -sk https://api.example.com/v1/models -H "Authorization: Bearer <key>"` |
+| Model not found in LiteLLM | `MODEL_NAME` not registered | List models: `curl -sk https://litellm.solutions.ai/v1/models -H "Authorization: Bearer <key>"` |
+| LLM calls fail with `RBAC: access denied` / connection reset | Namespace not allowed to reach LiteLLM | Add `coding-agent-maf` to `litellm_allowed_namespaces` and re-run `./es_auto_installer.sh install agent-toolkit` (or redeploy with `PATCH_LITELLM_AUTHZ=true`); check `kubectl get ns coding-agent-maf --show-labels` has `istio.io/dataplane-mode=ambient` |
+| `401` from the gateway on `https://coding-agent.<base>` | Gateway-wide `gateway-auth` applied to the route | Ensure `httpRoute.bypassGatewayAuth=true` (route-level SecurityPolicy present: `kubectl get securitypolicy -n coding-agent-maf`) |
+| `install_package` times out in the sandbox | Sandbox egress is public-IPs-only, no proxy | The sandbox needs direct internet access for `pip install` |
+| Pod rejected with `violates PodSecurity "restricted"` | Custom values re-added privileged settings | Keep the chart's `securityContext` (UID/GID 10001, drop ALL, seccomp RuntimeDefault) |
 
 ### View logs
 

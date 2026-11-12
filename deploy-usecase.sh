@@ -2,7 +2,8 @@
 # Copyright (C) 2025-2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 # =============================================================================
-# deploy-usecase.sh — One-click deployer for Agentic AI Stack use cases
+# deploy-usecase.sh — One-click deployer for blueprints on Intel® Agent Toolkit
+# (installed by Toolkit Manager, release-1.2)
 #
 # A thin dispatcher: it collects shared configuration once, then delegates to
 # each use case's own deploy.sh (Kubernetes) or docker-compose.yml (Docker).
@@ -18,15 +19,15 @@
 #   ./deploy-usecase.sh banking-assistant --mode docker
 #   ./deploy-usecase.sh --all --mode kubernetes
 #
-# Environment variables (all optional — the use case's deploy.sh prompts if unset):
-#   CLUSTER_URL       Base domain of your Agentic AI Stack, e.g. api.example.com
-#   OPENAI_API_KEY    API key accepted by LiteLLM / GenAI Gateway
+# Environment variables (all optional — the use case's deploy.sh discovers or prompts):
+#   CLUSTER_URL       Toolkit Manager base_domain_name, e.g. solutions.ai
+#   OPENAI_API_KEY    LiteLLM API key (default: litellm-master-key secret)
 #   OPENAI_BASE_URL   LLM endpoint URL (auto-discovered in K8s mode if unset)
-#   MODEL_NAME        Model ID registered in LiteLLM
+#   MODEL_NAME        Model ID registered in LiteLLM, e.g. qwen2-5-coder-14b
 #   REDIS_URL         Redis endpoint (auto-discovered in K8s mode)
 #   NAMESPACE         Kubernetes namespace to deploy into (default: <usecase-name>)
-#   INGRESS_HOST      Ingress hostname (default: <usecase-name>.<CLUSTER_URL>)
-#   CERT_FILE/KEY_FILE  TLS cert + key PEM paths for ingress (optional)
+#   INGRESS_HOST      HTTPRoute hostname (default: <usecase-name>.<CLUSTER_URL>)
+#   PATCH_LITELLM_AUTHZ  true = add the namespace to LiteLLM's AuthorizationPolicy
 #   KUBECONFIG        Path to kubeconfig (default: ~/.kube/config)
 # =============================================================================
 set -euo pipefail
@@ -142,12 +143,13 @@ auto_discover_services() {
   }
 
   if [[ -z "${OPENAI_BASE_URL:-}" ]]; then
-    # The LiteLLM / GenAI Gateway serves the OpenAI API on port 4000. Match the
-    # gateway service by that port — matching the name alone would wrongly pick a
-    # co-located service (e.g. genai-gateway-postgresql:5432 sorts first).
-    local match
-    match=$(kubectl get svc -A -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.metadata.namespace}{" "}{range .spec.ports[*]}{.port}{" "}{end}{"|"}{"\n"}{end}' 2>/dev/null \
-      | grep -iE 'litellm|genai-gateway' | grep -E ' 4000( |\|)' | head -1) || true
+    # The Inference Toolkit installs LiteLLM as Service 'litellm' in namespace 'litellm'
+    # (port 4000). Fall back to any litellm Service on port 4000 —
+    # matching by name alone would pick a co-located cache/DB (e.g. litellm-redis).
+    local match=""
+    kubectl get svc litellm -n litellm &>/dev/null && match="litellm litellm 4000"
+    [[ -n "$match" ]] || match=$(kubectl get svc -A -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.metadata.namespace}{" "}{range .spec.ports[*]}{.port}{" "}{end}{"|"}{"\n"}{end}' 2>/dev/null \
+      | grep -i 'litellm' | grep -E ' 4000( |\|)' | head -1) || true
     if [[ -n "$match" ]]; then
       OPENAI_BASE_URL="http://$(awk '{printf "%s.%s.svc.cluster.local", $1, $2}' <<<"$match"):4000/v1"
       success "Auto-discovered LLM: $OPENAI_BASE_URL"
@@ -180,7 +182,11 @@ deploy_single() {
   [[ -d "${usecase_dir}" ]] || die "Use case '${usecase}' not found in ${USECASES_DIR}."
 
   export CLUSTER_URL OPENAI_API_KEY OPENAI_BASE_URL MODEL_NAME REDIS_URL \
-         NAMESPACE INGRESS_HOST CERT_FILE KEY_FILE TLS_SECRET_NAME 2>/dev/null || true
+         NAMESPACE INGRESS_HOST PATCH_LITELLM_AUTHZ \
+         SANDBOX_NAMESPACE SANDBOX_TEMPLATE SANDBOX_WARMPOOL SANDBOX_ROUTER_URL SANDBOX_ROUTER_TOKEN \
+         LANGFUSE_PUBLIC_KEY LANGFUSE_SECRET_KEY LANGFUSE_HOST LANGFUSE_ENABLE_SENSITIVE_DATA \
+         DEVUI_AUTH_TOKEN EMBEDDING_MODEL MEMORY_ENABLED \
+         TAVILY_API_KEY SERPER_API_KEY API_KEYS EVAL_DASHBOARD_ENABLED 2>/dev/null || true
 
   case "$MODE" in
     docker)
@@ -247,7 +253,7 @@ deploy_all() {
 main() {
   echo ""
   echo "============================================================"
-  echo "  Agentic AI Stack — Use Case Deployer"
+  echo "  Agentic AI Blueprints — Use Case Deployer"
   echo "  Mode: ${MODE}"
   [[ "$DEPLOY_ALL" == true ]] && echo "  Target: ALL use cases" || echo "  Target: ${USECASE}"
   echo "============================================================"

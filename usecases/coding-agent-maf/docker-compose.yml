@@ -1,16 +1,21 @@
 # Coding Agent — Local Development Stack
 # Runs the agent + Redis without Kubernetes.
-# Set LITELLM_URL and LITELLM_API_KEY to point at your running LiteLLM gateway.
+# Set LITELLM_URL and LITELLM_API_KEY to point at your running LiteLLM gateway —
+# on a Toolkit Manager stack that is https://litellm.<base_domain_name>/v1 with a LiteLLM
+# (virtual or master) key; the host must resolve to the eg-gateway IP and trust
+# its CA (env/<env>/logs/ai-solutions-ca.crt).
 #
 # Usage:
-#   export LITELLM_URL=http://your-host:4000/v1
+#   export LITELLM_URL=https://litellm.solutions.ai/v1
 #   export LITELLM_API_KEY=sk-your-key
-#   # Proxy values are read from env vars sourced from agentic-config.cfg:
+#   export MODEL_NAME=qwen2-5-coder-14b   # must support tool calling
+#   # Proxy values (http_proxy, https_proxy, no_proxy) are read from your shell env.
+#   docker compose up --build
 
 services:
 
   coding-agent:
-    image: coding-agent:latest        # built by agentic-stack.sh, or build locally below
+    image: coding-agent:latest        # built by deploy.sh, or build locally below
     build:
       context: ./src
       dockerfile: Dockerfile
@@ -29,12 +34,12 @@ services:
     environment:
       OPENAI_BASE_URL: "${LITELLM_URL:-http://host.docker.internal:4000/v1}"
       OPENAI_API_KEY: "${LITELLM_API_KEY:-sk-placeholder}"
-      MODEL_NAME: "openai/Qwen/Qwen2.5-Coder-7B-Instruct"
+      MODEL_NAME: "${MODEL_NAME:-qwen2-5-coder-14b}"
       REDIS_URL: "redis://redis-stack:6379"
       WORKSPACE_DIR: "/app/workspace"
-      SANDBOX_NAMESPACE: "${SANDBOX_NAMESPACE:-agent-sandbox}"
+      SANDBOX_NAMESPACE: "${SANDBOX_NAMESPACE:-agent-sandbox-system}"
       SANDBOX_TEMPLATE: "${SANDBOX_TEMPLATE:-python-sandbox-template}"
-      SANDBOX_ROUTER_URL: "${SANDBOX_ROUTER_URL:-http://sandbox-router-svc.agent-sandbox.svc.cluster.local:8080}"
+      SANDBOX_ROUTER_URL: "${SANDBOX_ROUTER_URL:-http://sandbox-router-svc.agent-sandbox-system.svc.cluster.local:8080}"
       http_proxy: "${http_proxy:-}"
       https_proxy: "${https_proxy:-}"
       no_proxy: "${no_proxy:-}"

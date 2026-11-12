@@ -5,7 +5,7 @@
 Banking Assistant agent.
 
 A Microsoft Agent Framework agent that routes natural-language banking requests
-to a GenAI-gateway model and uses a remote MCP server (the banking sidecar,
+to a LiteLLM-served model and uses a remote MCP server (the banking sidecar,
 reached at MCP_SERVER_URL) for all factual account data and operations.
 
 The agent connects to the MCP server as a client and exposes its tools to the

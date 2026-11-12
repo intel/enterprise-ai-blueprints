@@ -1,0 +1,13 @@
+streamlit
+openai
+fastapi
+uvicorn[standard]
+# Long-term memory: RediSearch vector store (cluster redis-stack) + gateway embeddings
+redis>=5.0
+# Parallel tool execution via the agent-toolkit KubeRay cluster (optional; only
+# used when TOOL_EXECUTOR=ray, otherwise tools run in a local thread pool).
+# Pinned to 2.56.x (~=) to patch CVE-2025-62593, CVE-2026-57516 and the other
+# 2025/2026 Ray advisories. The client must match the cluster's Ray version: set
+# kuberay_ray_image in config.agent-toolkit.yaml to rayproject/ray:2.56.0-py312
+# (the agent-toolkit default is 2.40.0). The image is Python 3.12 to match.
+ray[client]~=2.56.0

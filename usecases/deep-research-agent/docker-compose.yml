@@ -1,0 +1,54 @@
+###############################################################################
+# Docker Compose — Local development stack for the Deep Research Agent
+#
+# No models are started here. Point it at any OpenAI-compatible endpoint — on
+# a Toolkit Manager stack that is Intel Inference Toolkit LiteLLM at
+# https://litellm.<base_domain_name>/v1 with a
+# LiteLLM key (the host must resolve to the eg-gateway IP and trust its CA,
+# env/<env>/logs/ai-solutions-ca.crt) — and set TAVILY_API_KEY for web search.
+#
+# Usage:
+#   export LITELLM_URL=https://litellm.solutions.ai/v1 LITELLM_API_KEY=sk-your-key
+#   export MODEL_NAME=qwen2-5-coder-14b TAVILY_API_KEY=tvly-...
+#   docker compose up --build -d   # or: ../../deploy-usecase.sh deep-research-agent --mode docker
+#   (values in config/agent-config.env are used when the env vars are unset)
+###############################################################################
+
+services:
+  deep-research-agent:
+    image: deep-research-agent:latest
+    build:
+      context: ./src
+      dockerfile: Dockerfile
+      args:
+        http_proxy: "${http_proxy:-}"
+        https_proxy: "${https_proxy:-}"
+        no_proxy: "${no_proxy:-}"
+        HTTP_PROXY: "${HTTP_PROXY:-${http_proxy:-}}"
+        HTTPS_PROXY: "${HTTPS_PROXY:-${https_proxy:-}}"
+        NO_PROXY: "${NO_PROXY:-${no_proxy:-}}"
+    container_name: deep-research-agent
+    ports:
+      - "8081:8081"   # Research API + web UI
+      - "8082:8082"   # Eval metrics dashboard (set EVAL_DASHBOARD_ENABLED=true)
+    env_file:
+      - ./config/agent-config.env
+    environment:
+      LLM_BASE_URL: "${LITELLM_URL:-${LLM_BASE_URL:-http://host.docker.internal:4000/v1}}"
+      LLM_API_KEY: "${LITELLM_API_KEY:-${LLM_API_KEY:-}}"
+      LLM_MODEL: "${MODEL_NAME:-${LLM_MODEL:-qwen2-5-coder-14b}}"
+      TAVILY_API_KEY: "${TAVILY_API_KEY:-}"
+    volumes:
+      # SQLite DB (sessions + search cache) and per-query metrics
+      - deep-research-data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8081/health')"]
+      interval: 30s
+      timeout: 15s
+      start_period: 90s
+      retries: 3
+
+volumes:
+  deep-research-data:
+    driver: local

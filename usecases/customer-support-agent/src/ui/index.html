@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TechGadgets Customer Support Agent</title>
+<style>
+:root {
+  --bg-primary: #0d1117;
+  --bg-secondary: #161b22;
+  --bg-tertiary: #21262d;
+  --bg-card: #1c2128;
+  --border: #30363d;
+  --text-primary: #e6edf3;
+  --text-secondary: #8b949e;
+  --text-muted: #6e7681;
+  --accent: #58a6ff;
+  --accent-hover: #79c0ff;
+  --green: #3fb950;
+  --green-bg: rgba(63,185,80,0.1);
+  --yellow: #d29922;
+  --yellow-bg: rgba(210,153,34,0.1);
+  --red: #f85149;
+  --red-bg: rgba(248,81,73,0.1);
+  --purple: #bc8cff;
+  --purple-bg: rgba(188,140,255,0.1);
+  --orange: #f0883e;
+  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --mono: 'SF Mono', 'Cascadia Code', 'Fira Code', monospace;
+  --radius: 8px;
+  --shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: var(--font); background: var(--bg-primary); color: var(--text-primary); height: 100vh; overflow: hidden; }
+
+/* Layout */
+.app { display: grid; grid-template-rows: 56px 1fr; height: 100vh; }
+.header { background: var(--bg-secondary); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 20px; gap: 16px; }
+.header h1 { font-size: 16px; font-weight: 600; }
+.header .badge { background: var(--accent); color: #000; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 12px; }
+.header .model-tag { color: var(--text-secondary); font-size: 12px; font-family: var(--mono); }
+.header .spacer { flex:1; }
+.header .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); }
+.header .status-label { font-size: 12px; color: var(--text-secondary); }
+
+.main { display: grid; grid-template-columns: 1fr 420px; overflow: hidden; }
+
+/* Chat Panel */
+.chat-panel { display: flex; flex-direction: column; border-right: 1px solid var(--border); }
+.chat-messages { flex: 1; overflow-y: auto; padding: 20px; }
+.chat-input-area { padding: 16px 20px; border-top: 1px solid var(--border); background: var(--bg-secondary); }
+.chat-input-row { display: flex; gap: 10px; align-items: flex-end; }
+.chat-input-row textarea { flex:1; background: var(--bg-tertiary); border: 1px solid var(--border); color: var(--text-primary); padding: 10px 14px; border-radius: var(--radius); font-family: var(--font); font-size: 14px; resize: none; min-height: 42px; max-height: 120px; line-height: 1.4; outline: none; transition: border-color 0.2s; }
+.chat-input-row textarea:focus { border-color: var(--accent); }
+.chat-input-row button { background: var(--accent); color: #000; border: none; padding: 10px 18px; border-radius: var(--radius); font-weight: 600; font-size: 14px; cursor: pointer; white-space: nowrap; transition: background 0.2s; }
+.chat-input-row button:hover { background: var(--accent-hover); }
+.chat-input-row button:disabled { opacity: 0.5; cursor: not-allowed; }
+.customer-id-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.customer-id-row label { font-size: 12px; color: var(--text-secondary); }
+.customer-id-row input { background: var(--bg-tertiary); border: 1px solid var(--border); color: var(--text-primary); padding: 4px 10px; border-radius: 4px; font-size: 12px; font-family: var(--mono); width: 110px; outline: none; }
+.customer-id-row input:focus { border-color: var(--accent); }
+
+/* Messages */
+.message { margin-bottom: 16px; display: flex; gap: 12px; }
+.message.user { justify-content: flex-end; }
+.message.user .msg-bubble { background: #1f3a5f; border: 1px solid #2d5a8c; border-radius: 12px 12px 2px 12px; }
+.message.assistant .msg-bubble { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px 12px 12px 2px; }
+.msg-bubble { max-width: 80%; padding: 12px 16px; font-size: 14px; line-height: 1.6; }
+.msg-bubble p { margin-bottom: 8px; }
+.msg-bubble p:last-child { margin-bottom: 0; }
+.msg-bubble strong { color: var(--accent); font-weight: 600; }
+.msg-bubble code { background: var(--bg-tertiary); padding: 2px 6px; border-radius: 3px; font-family: var(--mono); font-size: 12px; }
+.msg-bubble ul, .msg-bubble ol { padding-left: 20px; margin: 6px 0; }
+.msg-bubble li { margin-bottom: 4px; }
+
+.msg-avatar { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
+.message.user .msg-avatar { background: #1f3a5f; order: 2; }
+.message.assistant .msg-avatar { background: var(--bg-tertiary); }
+
+.msg-tools-badge { display: inline-flex; align-items: center; gap: 4px; margin-top: 8px; padding: 3px 8px; background: var(--purple-bg); border: 1px solid rgba(188,140,255,0.3); border-radius: 4px; font-size: 11px; color: var(--purple); cursor: pointer; }
+.msg-tools-badge:hover { background: rgba(188,140,255,0.2); }
+
+.typing-indicator { display: flex; gap: 4px; padding: 12px 16px; }
+.typing-indicator span { width: 6px; height: 6px; border-radius: 50%; background: var(--text-muted); animation: typingBounce 1.2s infinite; }
+.typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+.typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes typingBounce { 0%,60%,100%{transform:translateY(0)} 30%{transform:translateY(-4px)} }
+
+/* Traces Panel */
+.traces-panel { background: var(--bg-secondary); display: flex; flex-direction: column; overflow: hidden; }
+.traces-header { padding: 14px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; }
+.traces-header h2 { font-size: 14px; font-weight: 600; }
+.traces-header .trace-count { font-size: 11px; color: var(--text-secondary); background: var(--bg-tertiary); padding: 2px 8px; border-radius: 10px; }
+.traces-tabs { display: flex; border-bottom: 1px solid var(--border); }
+.traces-tab { padding: 10px 16px; font-size: 12px; color: var(--text-secondary); cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; }
+.traces-tab:hover { color: var(--text-primary); }
+.traces-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.traces-content { flex: 1; overflow-y: auto; padding: 12px; }
+
+/* Trace Items */
+.trace-group { margin-bottom: 16px; }
+.trace-group-header { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; padding: 0 4px; display: flex; align-items: center; gap: 8px; }
+.trace-group-header::after { content:''; flex:1; height:1px; background:var(--border); }
+
+.trace-item { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 8px; overflow: hidden; cursor: pointer; transition: border-color 0.2s; }
+.trace-item:hover { border-color: var(--accent); }
+.trace-item.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.trace-item-header { display: flex; align-items: center; gap: 8px; padding: 10px 12px; }
+.trace-item-icon { width: 24px; height: 24px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 12px; flex-shrink: 0; }
+.trace-item-icon.tool { background: var(--purple-bg); color: var(--purple); }
+.trace-item-icon.success { background: var(--green-bg); color: var(--green); }
+.trace-item-icon.error { background: var(--red-bg); color: var(--red); }
+.trace-item-icon.thinking { background: var(--yellow-bg); color: var(--yellow); }
+.trace-item-name { font-size: 13px; font-weight: 500; flex: 1; }
+.trace-item-duration { font-size: 11px; color: var(--text-muted); font-family: var(--mono); }
+.trace-item-body { padding: 0 12px 12px; display: none; }
+.trace-item.expanded .trace-item-body { display: block; }
+.trace-section { margin-top: 8px; }
+.trace-section-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 4px; }
+.trace-json { background: var(--bg-primary); border: 1px solid var(--border); border-radius: 4px; padding: 8px 10px; font-family: var(--mono); font-size: 11px; line-height: 1.5; color: var(--text-secondary); overflow-x: auto; max-height: 200px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; }
+
+/* Summary Card */
+.trace-summary { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; margin-bottom: 16px; }
+.trace-summary-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 12px; }
+.trace-summary-row .label { color: var(--text-secondary); }
+.trace-summary-row .value { color: var(--text-primary); font-family: var(--mono); font-weight: 500; }
+
+/* Conversation List (for trace tab) */
+.conv-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: var(--radius); cursor: pointer; margin-bottom: 4px; transition: background 0.15s; }
+.conv-item:hover { background: var(--bg-tertiary); }
+.conv-item.active { background: var(--bg-tertiary); border: 1px solid var(--border); }
+.conv-item-dot { width: 8px; height: 8px; border-radius: 50%; }
+.conv-item-text { font-size: 13px; flex:1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.conv-item-meta { font-size: 11px; color: var(--text-muted); font-family: var(--mono); }
+
+/* Quick Actions */
+.quick-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.quick-btn { background: var(--bg-tertiary); border: 1px solid var(--border); color: var(--text-secondary); padding: 6px 12px; border-radius: 16px; font-size: 12px; cursor: pointer; transition: all 0.2s; }
+.quick-btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(88,166,255,0.05); }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--bg-tertiary); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--border); }
+
+/* Empty state */
+.empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--text-muted); gap: 8px; }
+.empty-state .icon { font-size: 32px; opacity: 0.5; }
+.empty-state .text { font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- Header -->
+  <div class="header">
+    <h1>TechGadgets.com Support Agent</h1>
+    <span class="badge" id="tools-count">40 Tools</span>
+    <span class="model-tag" id="model-name">Qwen2.5-Coder-14B</span>
+    <span class="spacer"></span>
+    <span class="status-dot" id="status-dot"></span>
+    <span class="status-label" id="status-label">Connected</span>
+  </div>
+
+  <div class="main">
+    <!-- Chat Panel -->
+    <div class="chat-panel">
+      <div class="chat-messages" id="chat-messages">
+        <div class="quick-actions" id="quick-actions">
+          <button class="quick-btn" onclick="sendQuick('What gaming laptops do you have?')">Gaming Laptops</button>
+          <button class="quick-btn" onclick="sendQuick('Track order ORD-2024-000013')">Track Order</button>
+          <button class="quick-btn" onclick="sendQuick('I want to return my headphones')">Return Item</button>
+          <button class="quick-btn" onclick="sendQuick('Is coupon SAVE20 valid?')">Check Coupon</button>
+          <button class="quick-btn" onclick="sendQuick('What is your return policy?')">Return Policy</button>
+          <button class="quick-btn" onclick="sendQuick('Check warranty on order ORD-2024-000050')">Warranty Check</button>
+          <button class="quick-btn" onclick="sendQuick('Compare ProBook X1 Ultra vs GameForce RTX Pro')">Compare Products</button>
+          <button class="quick-btn" onclick="sendQuick('What are your current promotions?')">Promotions</button>
+        </div>
+      </div>
+      <div class="chat-input-area">
+        <div class="customer-id-row">
+          <label>Customer ID:</label>
+          <input type="text" id="customer-id" value="CUST-0001" />
+          <span style="font-size:11px; color:var(--text-muted);">Authenticated session</span>
+        </div>
+        <div class="chat-input-row">
+          <textarea id="chat-input" placeholder="Ask about orders, products, returns, policies..." rows="1" onkeydown="handleKey(event)"></textarea>
+          <button id="send-btn" onclick="sendMessage()">Send</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Traces Panel -->
+    <div class="traces-panel">
+      <div class="traces-header">
+        <h2>Traces & Tool Calls</h2>
+        <span class="trace-count" id="trace-count">0 calls</span>
+      </div>
+      <div class="traces-tabs">
+        <div class="traces-tab active" data-tab="current" onclick="switchTraceTab('current')">Current</div>
+        <div class="traces-tab" data-tab="history" onclick="switchTraceTab('history')">History</div>
+        <div class="traces-tab" data-tab="tools" onclick="switchTraceTab('tools')">All Tools</div>
+      </div>
+      <div class="traces-content" id="traces-content">
+        <div class="empty-state">
+          <div class="icon">&#9881;</div>
+          <div class="text">Tool traces will appear here</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API_BASE = window.location.origin + '/api/v1';
+let conversationHistory = [];
+let allTraces = []; // all interactions
+let currentTraces = []; // current message traces
+let isProcessing = false;
+
+// Auto-resize textarea
+const textarea = document.getElementById('chat-input');
+textarea.addEventListener('input', () => {
+  textarea.style.height = 'auto';
+  textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
+});
+
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+}
+
+function sendQuick(text) {
+  document.getElementById('chat-input').value = text;
+  sendMessage();
+}
+
+async function sendMessage() {
+  const input = document.getElementById('chat-input');
+  const msg = input.value.trim();
+  if (!msg || isProcessing) return;
+
+  input.value = '';
+  input.style.height = 'auto';
+  isProcessing = true;
+  document.getElementById('send-btn').disabled = true;
+
+  // Hide quick actions on first message
+  const qa = document.getElementById('quick-actions');
+  if (qa) qa.style.display = 'none';
+
+  // Add user message
+  appendMessage('user', msg);
+
+  // Show typing indicator
+  const typingEl = appendTyping();
+
+  // Call API
+  try {
+    const customerId = document.getElementById('customer-id').value.trim();
+    const startTime = performance.now();
+
+    const res = await fetch(API_BASE + '/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: msg,
+        customer_id: customerId,
+        conversation_history: conversationHistory,
+      }),
+    });
+
+    const data = await res.json();
+    const elapsed = performance.now() - startTime;
+
+    // Remove typing
+    typingEl.remove();
+
+    // Add assistant message
+    appendMessage('assistant', data.response, data.tool_calls);
+
+    // Update conversation history
+    conversationHistory.push({ role: 'user', content: msg });
+    conversationHistory.push({ role: 'assistant', content: data.response });
+
+    // Store traces
+    const interaction = {
+      id: allTraces.length + 1,
+      query: msg,
+      response: data.response,
+      tool_calls: data.tool_calls || [],
+      metadata: data.metadata || {},
+      timestamp: new Date().toISOString(),
+      elapsed_ms: elapsed,
+    };
+    allTraces.push(interaction);
+    currentTraces = data.tool_calls || [];
+
+    // Update traces panel
+    renderCurrentTraces(interaction);
+    updateTraceCount();
+
+  } catch (err) {
+    typingEl.remove();
+    appendMessage('assistant', 'Error: Unable to reach the agent API. ' + err.message);
+  }
+
+  isProcessing = false;
+  document.getElementById('send-btn').disabled = false;
+}
+
+function appendMessage(role, content, toolCalls) {
+  const container = document.getElementById('chat-messages');
+  const div = document.createElement('div');
+  div.className = `message ${role}`;
+
+  const avatar = role === 'user' ? '&#128100;' : '&#129302;';
+  const bubbleHtml = formatMarkdown(content);
+
+  let toolBadge = '';
+  if (toolCalls && toolCalls.length > 0) {
+    toolBadge = `<div class="msg-tools-badge" onclick="scrollToTraces()">&#9881; ${toolCalls.length} tool call${toolCalls.length > 1 ? 's' : ''}</div>`;
+  }
+
+  div.innerHTML = `
+    <div class="msg-avatar">${avatar}</div>
+    <div class="msg-bubble">${bubbleHtml}${toolBadge}</div>
+  `;
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+  return div;
+}
+
+function appendTyping() {
+  const container = document.getElementById('chat-messages');
+  const div = document.createElement('div');
+  div.className = 'message assistant';
+  div.innerHTML = `
+    <div class="msg-avatar">&#129302;</div>
+    <div class="msg-bubble"><div class="typing-indicator"><span></span><span></span><span></span></div></div>
+  `;
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+  return div;
+}
+
+function formatMarkdown(text) {
+  if (!text) return '';
+  let html = text
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/`(.+?)`/g, '<code>$1</code>')
+    .replace(/^\- (.+)$/gm, '<li>$1</li>')
+    .replace(/^\d+\.\s+(.+)$/gm, '<li>$1</li>');
+  // Wrap consecutive <li> in <ul>
+  html = html.replace(/((?:<li>.*<\/li>\n?)+)/g, '<ul>$1</ul>');
+  // Paragraphs
+  html = html.split('\n\n').map(p => p.startsWith('<ul>') ? p : `<p>${p}</p>`).join('');
+  html = html.replace(/\n/g, '<br>');
+  return html;
+}
+
+// ─── Traces Panel ───────────────────────────────────────────────────────────
+
+function renderCurrentTraces(interaction) {
+  const container = document.getElementById('traces-content');
+
+  let html = `<div class="trace-summary">
+    <div class="trace-summary-row"><span class="label">Query</span><span class="value" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(interaction.query.substring(0, 50))}</span></div>
+    <div class="trace-summary-row"><span class="label">Turns</span><span class="value">${interaction.metadata.turns || '-'}</span></div>
+    <div class="trace-summary-row"><span class="label">Tool Calls</span><span class="value">${interaction.tool_calls.length}</span></div>
+    <div class="trace-summary-row"><span class="label">Latency</span><span class="value">${interaction.metadata.latency_ms ? interaction.metadata.latency_ms.toFixed(0) + 'ms' : '-'}</span></div>
+    <div class="trace-summary-row"><span class="label">Tokens</span><span class="value">${interaction.metadata.total_tokens || '-'}</span></div>
+  </div>`;
+
+  if (interaction.tool_calls.length === 0) {
+    html += '<div class="empty-state" style="height:auto;padding:20px"><div class="text">No tools called for this message</div></div>';
+  } else {
+    html += '<div class="trace-group"><div class="trace-group-header">Tool Executions</div>';
+    interaction.tool_calls.forEach((tc, i) => {
+      const isSuccess = !tc.result.error;
+      const iconClass = isSuccess ? 'success' : 'error';
+      const icon = isSuccess ? '&#10003;' : '&#10007;';
+      html += `
+        <div class="trace-item" onclick="toggleTrace(this)" id="trace-${i}">
+          <div class="trace-item-header">
+            <div class="trace-item-icon ${iconClass}">${icon}</div>
+            <div class="trace-item-name">${escHtml(tc.name)}</div>
+            <div class="trace-item-duration">${tc.duration_ms.toFixed(1)}ms</div>
+          </div>
+          <div class="trace-item-body">
+            <div class="trace-section">
+              <div class="trace-section-label">Arguments</div>
+              <div class="trace-json">${syntaxHighlight(tc.arguments)}</div>
+            </div>
+            <div class="trace-section">
+              <div class="trace-section-label">Result</div>
+              <div class="trace-json">${syntaxHighlight(tc.result)}</div>
+            </div>
+          </div>
+        </div>`;
+    });
+    html += '</div>';
+  }
+
+  container.innerHTML = html;
+}
+
+function renderHistoryTab() {
+  const container = document.getElementById('traces-content');
+  if (allTraces.length === 0) {
+    container.innerHTML = '<div class="empty-state"><div class="icon">&#128196;</div><div class="text">No conversation history yet</div></div>';
+    return;
+  }
+  let html = '';
+  allTraces.forEach((interaction, i) => {
+    const toolCount = interaction.tool_calls.length;
+    const dotColor = toolCount > 0 ? 'var(--green)' : 'var(--text-muted)';
+    html += `<div class="conv-item" onclick="showInteraction(${i})">
+      <div class="conv-item-dot" style="background:${dotColor}"></div>
+      <div class="conv-item-text">${escHtml(interaction.query)}</div>
+      <div class="conv-item-meta">${toolCount} tool${toolCount !== 1 ? 's' : ''} &middot; ${interaction.metadata.latency_ms ? Math.round(interaction.metadata.latency_ms) + 'ms' : '-'}</div>
+    </div>`;
+  });
+  container.innerHTML = html;
+}
+
+function renderToolsTab() {
+  const container = document.getElementById('traces-content');
+  fetch(API_BASE + '/tools').then(r => r.json()).then(tools => {
+    let html = `<div class="trace-summary"><div class="trace-summary-row"><span class="label">Total Tools</span><span class="value">${tools.length}</span></div></div>`;
+    const categories = {};
+    tools.forEach(t => {
+      const cat = t.name.split('_')[0];
+      if (!categories[cat]) categories[cat] = [];
+      categories[cat].push(t);
+    });
+    Object.entries(categories).sort().forEach(([cat, items]) => {
+      html += `<div class="trace-group"><div class="trace-group-header">${cat} (${items.length})</div>`;
+      items.forEach(t => {
+        html += `<div class="trace-item" onclick="toggleTrace(this)">
+          <div class="trace-item-header">
+            <div class="trace-item-icon tool">&#9881;</div>
+            <div class="trace-item-name">${escHtml(t.name)}</div>
+          </div>
+          <div class="trace-item-body">
+            <div class="trace-section">
+              <div class="trace-section-label">Description</div>
+              <div class="trace-json">${escHtml(t.description)}</div>
+            </div>
+            <div class="trace-section">
+              <div class="trace-section-label">Parameters</div>
+              <div class="trace-json">${syntaxHighlight(t.parameters)}</div>
+            </div>
+          </div>
+        </div>`;
+      });
+      html += '</div>';
+    });
+    container.innerHTML = html;
+  });
+}
+
+function showInteraction(idx) {
+  renderCurrentTraces(allTraces[idx]);
+  // Switch to current tab
+  document.querySelectorAll('.traces-tab').forEach(t => t.classList.remove('active'));
+  document.querySelector('.traces-tab[data-tab="current"]').classList.add('active');
+}
+
+function switchTraceTab(tab) {
+  document.querySelectorAll('.traces-tab').forEach(t => t.classList.remove('active'));
+  document.querySelector(`.traces-tab[data-tab="${tab}"]`).classList.add('active');
+  if (tab === 'current') {
+    if (allTraces.length > 0) renderCurrentTraces(allTraces[allTraces.length - 1]);
+    else document.getElementById('traces-content').innerHTML = '<div class="empty-state"><div class="icon">&#9881;</div><div class="text">Tool traces will appear here</div></div>';
+  } else if (tab === 'history') {
+    renderHistoryTab();
+  } else if (tab === 'tools') {
+    renderToolsTab();
+  }
+}
+
+function toggleTrace(el) {
+  el.classList.toggle('expanded');
+}
+
+function scrollToTraces() {
+  // On mobile this could scroll to the traces panel
+}
+
+function updateTraceCount() {
+  const total = allTraces.reduce((s, i) => s + i.tool_calls.length, 0);
+  document.getElementById('trace-count').textContent = `${total} call${total !== 1 ? 's' : ''}`;
+}
+
+function escHtml(s) {
+  if (typeof s !== 'string') s = String(s);
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function syntaxHighlight(obj) {
+  const json = JSON.stringify(obj, null, 2);
+  if (!json) return '';
+  return json
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"([^"]+)":/g, '<span style="color:var(--accent)">"$1"</span>:')
+    .replace(/: "([^"]*?)"/g, ': <span style="color:var(--green)">"$1"</span>')
+    .replace(/: (\d+\.?\d*)/g, ': <span style="color:var(--orange)">$1</span>')
+    .replace(/: (true|false)/g, ': <span style="color:var(--purple)">$1</span>')
+    .replace(/: null/g, ': <span style="color:var(--text-muted)">null</span>');
+}
+
+// ─── Init ───────────────────────────────────────────────────────────────────
+async function init() {
+  try {
+    const res = await fetch(API_BASE + '/health');
+    const data = await res.json();
+    document.getElementById('tools-count').textContent = data.tools_count + ' Tools';
+    document.getElementById('model-name').textContent = data.model.split('/').pop();
+    document.getElementById('status-dot').style.background = 'var(--green)';
+    document.getElementById('status-label').textContent = 'Connected';
+  } catch (e) {
+    document.getElementById('status-dot').style.background = 'var(--red)';
+    document.getElementById('status-label').textContent = 'Disconnected';
+  }
+}
+init();
+</script>
+</body>
+</html>

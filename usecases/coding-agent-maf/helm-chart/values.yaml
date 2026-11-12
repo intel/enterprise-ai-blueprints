@@ -25,23 +25,23 @@ agent:
   # LLM configuration – openaiApiKey is required
   openaiApiKey: ""            # REQUIRED – set via --set or a separate secret values file
   devuiAuthToken: ""          # REQUIRED – auth token for DevUI when bound to non-loopback host
-  openaiBaseUrl: "http://genai-gateway-service.genai-gateway.svc.cluster.local:4000/v1"
+  openaiBaseUrl: "http://litellm.litellm.svc.cluster.local:4000/v1"   # Intel Inference Toolkit LiteLLM
   # Langfuse observability (optional)
   langfusePublicKey: ""
   langfuseSecretKey: ""
-  langfuseHost: ""              # -> LANGFUSE_HOST (the SDK's env var)
+  langfuseHost: ""              # -> LANGFUSE_HOST, e.g. http://langfuse-web.langfuse.svc.cluster.local:3000
   langfuseEnableSensitiveData: "true"
-  # modelName is set dynamically by deploy-agentic-stack.sh from the 'models' field in
-  # agentic-config.cfg (e.g. cpu-qwen3-coder-30b -> Qwen/Qwen3-Coder-30B-A3B-Instruct).
-  # For manual Helm installs set this to the model ID registered in LiteLLM:
-  #   helm install coding-agent ./helm-chart --set agent.modelName="Qwen/Qwen3-Coder-30B-A3B-Instruct" ...
+  # modelName must be a model ID registered in LiteLLM (Inference Toolkit default:
+  # qwen2-5-coder-14b, set by llm_services_autodeploy_models in config.agent-toolkit.yaml).
+  # deploy.sh prompts for it; for manual Helm installs:
+  #   helm install coding-agent ./helm-chart --set agent.modelName="qwen2-5-coder-14b" ...
   modelName: ""   # REQUIRED – always injected by deploy script; must be set for manual installs
 
   # Proxy bypass list – cluster-internal traffic must not go through the corporate proxy
   noProxy: "localhost,127.0.0.1,intel.com,.svc,.svc.cluster.local,.default.svc.cluster.local,.agent-sandbox-system.svc.cluster.local,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
 
-  # Agent Sandbox. Controller/router default namespace is 'agent-sandbox-system'
-  # (verify: kubectl get sandboxtemplate,sandboxwarmpool -A).
+  # Agent Sandbox (Intel Agent Toolkit, fixed namespace 'agent-sandbox-system').
+  # Verify: kubectl get sandboxtemplate,sandboxwarmpool -n agent-sandbox-system
   sandboxNamespace: "agent-sandbox-system"
   sandboxTemplate: "python-sandbox-template"
   sandboxWarmPool: "python-pool"          # warm pool to adopt sandboxes from
@@ -69,50 +69,45 @@ agent:
       cpu: "1"
       memory: 1Gi
 
-  # Node affinity — schedule the Coding Agent on inference-eligible worker nodes.
-  # Set to {} to disable and allow scheduling on any node.
-  affinity:
-    nodeAffinity:
-      requiredDuringSchedulingIgnoredDuringExecution:
-        nodeSelectorTerms:
-          - matchExpressions:
-              - key: ei-inference-eligible
-                operator: In
-                values: ["true"]
+  # Node affinity. Multi-node clusters installed by Toolkit Manager label nodes
+  # workload-class=platform|inference.
+  # Empty = schedule anywhere. Example soft preference:
+  #   affinity:
+  #     nodeAffinity:
+  #       preferredDuringSchedulingIgnoredDuringExecution:
+  #         - weight: 50
+  #           preference:
+  #             matchExpressions:
+  #               - key: workload-class
+  #                 operator: In
+  #                 values: ["platform"]
+  affinity: {}
 
 # ---------------------------------------------------------------------------
-# External Redis URL (optional)
-# Provide this when redis.enabled=false to point to an existing Redis instance.
-# Example: "redis://my-external-redis:6379"
+# Redis URL — shared Redis from Intel Agent Toolkit (namespace 'redis').
+# It requires auth: deploy.sh reads the full URL from the
+# redis-stack-server-credentials secret (key REDIS_URL).
 # ---------------------------------------------------------------------------
 redisUrl: "redis://redis-stack-server.redis.svc.cluster.local:6379"
 
 # ---------------------------------------------------------------------------
-# Redis (redis-stack-server subchart – alias: redis)
-# Set redis.enabled=false when providing an external redisUrl above.
-# NOTE: Helm cannot derive this flag automatically from redisUrl — both must
-#       be set together. Forgetting redis.enabled=false while setting redisUrl
-#       will cause a hard validation error at render time.
-# Full list of available subchart values:
-#   https://github.com/redis-stack/helm-redis-stack
+# HTTPRoute (Envoy Gateway / Gateway API)
+# The platform exposes services through the shared Envoy Gateway 'eg-gateway'
+# (namespace envoy-gateway-system); TLS is terminated there with the wildcard
+# *.<base_domain_name> certificate, so the chart needs no TLS secret.
 # ---------------------------------------------------------------------------
-# Redis sub-chart removed — shared Redis is deployed separately in the 'redis' namespace.
-# Use redisUrl above to connect to it.
-
-# ---------------------------------------------------------------------------
-# Ingress
-# Enable to expose the Coding Agent via the ingress controller.
-# ---------------------------------------------------------------------------
-ingress:
+httpRoute:
   enabled: false
-  className: nginx
-  host: ""            # e.g. coding-agent.api.example.com  (subdomain preferred over path-based)
+  host: ""            # e.g. coding-agent.solutions.ai  (<name>.<base_domain_name>)
   path: /
-  pathType: Prefix
-  tls:
-    enabled: false
-    secretName: ""    # TLS secret in the coding-agent namespace (copy from genai-gateway if needed)
-  annotations: {}    # No rewrite needed for subdomain routing
+  gateway:
+    name: eg-gateway
+    namespace: envoy-gateway-system
+    sectionName: https
+  # The gateway-wide SecurityPolicy validates a LiteLLM key on every request.
+  # DevUI has its own bearer token (DEVUI_AUTH_TOKEN), so by default the chart
+  # ships an empty route-level SecurityPolicy that opts this route out.
+  bypassGatewayAuth: true
 
 # ---------------------------------------------------------------------------
 # Chart-wide overrides
@@ -123,8 +118,8 @@ fullnameOverride: ""
 # ---------------------------------------------------------------------------
 # Ray distributed-computing integration (optional)
 #
-# Enable only when deploy_kuberay=on is set in agentic-config.cfg and the
-# KubeRay operator + RayCluster are running in the cluster.
+# Enable only when kuberay_enabled: true is set in config.agent-toolkit.yaml
+# and the KubeRay operator + RayCluster are running in the cluster.
 #
 # address format: ray://<cluster-name>-head-svc.<namespace>.svc.cluster.local:10001
 #   e.g. ray://ray-cluster-head-svc.ray-system.svc.cluster.local:10001

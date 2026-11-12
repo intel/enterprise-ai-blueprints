@@ -1,0 +1,70 @@
+{{- if .Values.httpRoute.enabled }}
+{{- $fullname := include "deep-research-agent.fullname" . }}
+# Exposes the research API + web UI through the platform's Envoy Gateway
+# (Gateway API). TLS is terminated at the gateway's https listener
+# (*.<base_domain_name>). Served at the root: api.py mounts the static frontend
+# at "/" behind the /api and /health routes.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ $fullname }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "deep-research-agent.labels" . | nindent 4 }}
+spec:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: {{ .Values.httpRoute.gateway.name }}
+      namespace: {{ .Values.httpRoute.gateway.namespace }}
+      {{- with .Values.httpRoute.gateway.sectionName }}
+      sectionName: {{ . }}
+      {{- end }}
+  {{- with .Values.httpRoute.host }}
+  hostnames:
+    - {{ . | quote }}
+  {{- end }}
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      {{- with .Values.httpRoute.timeout }}
+      timeouts:
+        request: {{ . | quote }}
+      {{- end }}
+      backendRefs:
+        - name: {{ $fullname }}
+          port: {{ .Values.agent.port }}
+{{- if and .Values.agent.evalDashboard.enabled .Values.httpRoute.dashboardHost }}
+---
+# The eval dashboard needs its own hostname — it references assets with
+# absolute paths (/vendor/..., /report/...), so a path prefix would break it.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ $fullname }}-dashboard
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "deep-research-agent.labels" . | nindent 4 }}
+spec:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: {{ .Values.httpRoute.gateway.name }}
+      namespace: {{ .Values.httpRoute.gateway.namespace }}
+      {{- with .Values.httpRoute.gateway.sectionName }}
+      sectionName: {{ . }}
+      {{- end }}
+  hostnames:
+    - {{ .Values.httpRoute.dashboardHost | quote }}
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: {{ $fullname }}
+          port: {{ .Values.agent.evalDashboard.port }}
+{{- end }}
+{{- end }}

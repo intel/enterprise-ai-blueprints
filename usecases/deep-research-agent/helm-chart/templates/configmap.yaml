@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "deep-research-agent.fullname" . }}-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "deep-research-agent.labels" . | nindent 4 }}
+data:
+  # --- LLM (primary) — no models are deployed by this chart ---
+  LLM_BASE_URL: {{ .Values.agent.llm.baseUrl | quote }}
+  LLM_MODEL: {{ .Values.agent.llm.model | quote }}
+  LLM_TEMPERATURE: {{ .Values.agent.llm.temperature | quote }}
+  # --- LLM (secondary, optional) ---
+  SECONDARY_LLM_BASE_URL: {{ .Values.agent.secondaryLlm.baseUrl | quote }}
+  SECONDARY_LLM_MODEL: {{ .Values.agent.secondaryLlm.model | quote }}
+  SECONDARY_LLM_MODULES: {{ .Values.agent.secondaryLlm.modules | quote }}
+  # --- Web search ---
+  TAVILY_SEARCH_DEPTH: {{ .Values.agent.search.searchDepth | quote }}
+  TAVILY_MAX_RESULTS: {{ .Values.agent.search.maxResults | quote }}
+  # --- Research pipeline ---
+  MAX_RESEARCH_CYCLES: {{ .Values.agent.pipeline.maxResearchCycles | quote }}
+  MIN_SOURCES_FOR_REPORT: {{ .Values.agent.pipeline.minSourcesForReport | quote }}
+  RELEVANCE_THRESHOLD: {{ .Values.agent.pipeline.relevanceThreshold | quote }}
+  AGENT_MAX_ITERATIONS: {{ .Values.agent.pipeline.agentMaxIterations | quote }}
+  USE_EXTRACTIVE_SUMMARIZER: {{ .Values.agent.pipeline.useExtractiveSummarizer | quote }}
+  EXTRACT_EMBEDDING_DEVICE: {{ .Values.agent.pipeline.extractEmbeddingDevice | quote }}
+  # --- Server ---
+  HOST: "0.0.0.0"
+  EVAL_DASHBOARD_ENABLED: {{ .Values.agent.evalDashboard.enabled | quote }}
+  # --- Storage (both paths live on the mounted volume) ---
+  DATABASE_URL: "sqlite+aiosqlite:///{{ .Values.agent.storage.mountPath }}/deep_research.db"
+  RESULTS_DIR: "{{ .Values.agent.storage.mountPath }}/results/live"
+  # --- Proxy bypass for cluster-internal traffic ---
+  NO_PROXY: {{ .Values.agent.noProxy | quote }}
+  no_proxy: {{ .Values.agent.noProxy | quote }}

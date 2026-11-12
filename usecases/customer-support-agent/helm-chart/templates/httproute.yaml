@@ -1,0 +1,52 @@
+{{- if .Values.httpRoute.enabled }}
+# Exposes the agent through the platform's Envoy Gateway (Gateway API).
+# TLS is terminated at the gateway's https listener (*.<base_domain_name>).
+# /api and /v1 go to FastAPI; everything else (incl. Streamlit's websocket at
+# /_stcore/stream) goes to the Streamlit UI.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ include "customer-support-agent.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "customer-support-agent.labels" . | nindent 4 }}
+spec:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: {{ .Values.httpRoute.gateway.name }}
+      namespace: {{ .Values.httpRoute.gateway.namespace }}
+      {{- with .Values.httpRoute.gateway.sectionName }}
+      sectionName: {{ . }}
+      {{- end }}
+  {{- with .Values.httpRoute.host }}
+  hostnames:
+    - {{ . | quote }}
+  {{- end }}
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /api
+        - path:
+            type: PathPrefix
+            value: /v1
+      {{- with .Values.httpRoute.timeout }}
+      timeouts:
+        request: {{ . | quote }}
+      {{- end }}
+      backendRefs:
+        - name: {{ include "customer-support-agent.fullname" . }}
+          port: {{ .Values.agent.apiPort }}
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      {{- with .Values.httpRoute.timeout }}
+      timeouts:
+        request: {{ . | quote }}
+      {{- end }}
+      backendRefs:
+        - name: {{ include "customer-support-agent.fullname" . }}
+          port: {{ .Values.agent.streamlitPort }}
+{{- end }}

@@ -1,0 +1,132 @@
+###############################################################################
+# Default values for the deep-research-agent Helm chart
+#
+# This chart deploys NO models. The agent talks to an OpenAI-compatible endpoint
+# (Intel Inference Toolkit LiteLLM by default) using agent.llm.{baseUrl,apiKey,model}.
+###############################################################################
+
+agent:
+  image:
+    repository: deep-research-agent
+    tag: ""             # empty = chart appVersion; deploy.sh sets the tag it built
+    pullPolicy: IfNotPresent
+
+  # Keep at 1: the SQLite database and the in-memory SSE progress queues are
+  # per-pod, so a second replica would not see an in-flight research session.
+  replicaCount: 1
+
+  # --- LLM (primary) ---------------------------------------------------------
+  # model MUST be tool-calling capable and registered in LiteLLM (Inference Toolkit
+  # default: qwen2-5-coder-14b) — raw provider ids are rejected with a 400.
+  llm:
+    baseUrl: "http://litellm.litellm.svc.cluster.local:4000/v1"   # Intel Inference Toolkit LiteLLM
+    apiKey: ""          # REQUIRED — injected into the Secret
+    model: ""           # REQUIRED — set at deploy time
+    temperature: 0.3
+    maxTokens: 4096
+    hardware: "GPU"     # UI telemetry label only
+
+  # --- LLM (secondary, optional) --------------------------------------------
+  # Offload lightweight structured modules to a smaller model. Leave modules
+  # empty to route everything to the primary.
+  secondaryLlm:
+    baseUrl: ""
+    apiKey: ""
+    model: ""
+    modules: ""         # e.g. "classify,analyze_gaps"
+    hardware: "Xeon"
+
+  # --- Web search ------------------------------------------------------------
+  # tavilyApiKey is required — without it the agent can only answer from
+  # parametric knowledge. serperApiKey is an optional second provider.
+  search:
+    tavilyApiKey: ""
+    serperApiKey: ""
+    searchDepth: "advanced"
+    maxResults: 5
+
+  # --- Research pipeline -----------------------------------------------------
+  pipeline:
+    maxResearchCycles: 1
+    minSourcesForReport: 3
+    relevanceThreshold: 0.4
+    reportMaxTokens: 8192
+    agentMaxIterations: 15
+    useExtractiveSummarizer: true
+    extractEmbeddingDevice: "cpu"
+
+  # App-level auth: comma-separated keys checked on X-API-Key for /api/* routes.
+  # Empty = open. /health is always public so probes work. NOTE: the bundled web
+  # UI does not send X-API-Key, so setting this makes the UI unusable — use it
+  # only for API-only deployments.
+  apiKeys: ""
+
+  # Research API + web UI port
+  port: 8081
+
+  # Live per-query metrics dashboard (second process in the same container)
+  evalDashboard:
+    enabled: false
+    port: 8082
+
+  # Persistent storage for the SQLite DB (sessions + search cache) and the
+  # per-query metrics files. Disable to use an emptyDir (data lost on restart).
+  storage:
+    enabled: true
+    size: 5Gi
+    storageClassName: ""
+    mountPath: /app/data
+
+  # Cluster-internal traffic must bypass the corporate proxy
+  noProxy: "localhost,127.0.0.1,.svc,.svc.cluster.local,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+
+  # Higher than other use cases: the extractive summarizer keeps a
+  # sentence-transformers model resident and embeds on the CPU.
+  resources:
+    requests:
+      cpu: "1"
+      memory: 2Gi
+    limits:
+      cpu: "4"
+      memory: 6Gi
+
+  # Pin the pod to a node (used when the image only exists in one node's
+  # containerd, e.g. built locally with nerdctl). Empty = schedule anywhere.
+  nodeSelector: {}
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+# Service exposure. type: ClusterIP (default), NodePort, or LoadBalancer.
+# When type=NodePort, optionally pin the ports (must be in 30000-32767).
+service:
+  type: ClusterIP
+  nodePort: ""
+  dashboardNodePort: ""
+
+# ---------------------------------------------------------------------------
+# HTTPRoute (Envoy Gateway / Gateway API)
+# The platform exposes services through the shared Envoy Gateway 'eg-gateway'
+# (namespace envoy-gateway-system); TLS is terminated there with the wildcard
+# *.<base_domain_name> certificate, so the chart needs no TLS secret.
+# ---------------------------------------------------------------------------
+httpRoute:
+  enabled: false
+  host: ""            # e.g. deep-research-agent.solutions.ai
+  # Optional separate hostname for the eval dashboard. It needs its own host
+  # rather than a path prefix because it serves assets from absolute paths
+  # (/vendor/..., /report/...). Only used when agent.evalDashboard.enabled.
+  dashboardHost: ""   # e.g. deep-research-agent-dashboard.solutions.ai
+  # Research runs stream progress over SSE for several minutes — raise the
+  # per-request timeout above the gateway default (600s).
+  timeout: "3600s"
+  gateway:
+    name: eg-gateway
+    namespace: envoy-gateway-system
+    sectionName: https
+  # The gateway-wide SecurityPolicy validates a LiteLLM key on every request;
+  # browsers can't send one, so by default the chart opts these routes out.
+  # The app's own auth is agent.apiKeys (X-API-Key on /api/*).
+  bypassGatewayAuth: true

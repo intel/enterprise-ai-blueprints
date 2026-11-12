@@ -24,6 +24,8 @@ import os
 import urllib.request
 
 AGENT_URL = os.environ.get("AGENT_URL", "http://localhost:8090").rstrip("/")
+if not AGENT_URL.startswith(("http://", "https://")):
+    raise SystemExit(f"AGENT_URL must be an http(s) URL, got: {AGENT_URL}")
 TOKEN = os.environ.get("DEVUI_AUTH_TOKEN", "")
 if not TOKEN:
     raise SystemExit("Set DEVUI_AUTH_TOKEN (printed by deploy.sh).")
@@ -42,7 +44,7 @@ PROMPTS = [
 
 def _get(path: str) -> dict:
     req = urllib.request.Request(f"{AGENT_URL}{path}", headers=_HEADERS)
-    with urllib.request.urlopen(req, timeout=600) as resp:
+    with urllib.request.urlopen(req, timeout=600) as resp:  # nosec B310 - AGENT_URL scheme validated above
         return json.loads(resp.read())
 
 
@@ -50,7 +52,7 @@ def _post(path: str, body: dict) -> dict:
     req = urllib.request.Request(
         f"{AGENT_URL}{path}", data=json.dumps(body).encode(), headers=_HEADERS, method="POST"
     )
-    with urllib.request.urlopen(req, timeout=600) as resp:
+    with urllib.request.urlopen(req, timeout=600) as resp:  # nosec B310 - AGENT_URL scheme validated above
         return json.loads(resp.read())
 
 

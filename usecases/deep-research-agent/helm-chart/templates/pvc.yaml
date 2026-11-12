@@ -1,0 +1,18 @@
+{{- if .Values.agent.storage.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "deep-research-agent.fullname" . }}-data
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "deep-research-agent.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  {{- if .Values.agent.storage.storageClassName }}
+  storageClassName: {{ .Values.agent.storage.storageClassName | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.agent.storage.size }}
+{{- end }}

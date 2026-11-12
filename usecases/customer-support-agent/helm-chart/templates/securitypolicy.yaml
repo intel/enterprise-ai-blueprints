@@ -1,0 +1,18 @@
+{{- if and .Values.httpRoute.enabled .Values.httpRoute.bypassGatewayAuth }}
+# Empty route-level SecurityPolicy: overrides the gateway-wide 'gateway-auth'
+# policy (LiteLLM key check) for this route only, so browsers can open the UI.
+# This blueprint has NO user auth of its own (demo data only) — set
+# httpRoute.bypassGatewayAuth=false to require a LiteLLM key on every request.
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: {{ include "customer-support-agent.fullname" . }}-no-gateway-auth
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "customer-support-agent.labels" . | nindent 4 }}
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: {{ include "customer-support-agent.fullname" . }}
+{{- end }}

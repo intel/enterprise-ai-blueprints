@@ -18,6 +18,7 @@ COPY requirements-mcp.txt .
 # apt-get upgrade patches base-image OS packages flagged by the image scan
 # (perl-base, gzip, libpcre2-8, libsqlite3, ...) to their fixed Debian versions.
 RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/* \
+    && pip install --no-cache-dir --upgrade "pip>=26.2" \
     && pip install --no-cache-dir -r requirements-mcp.txt
 
 # Copy the MCP server package (server.py + data.py + __init__.py)

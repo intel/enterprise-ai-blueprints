@@ -1,0 +1,111 @@
+# Default values for coding-agent (LangGraph).
+# Override these in a values file or with --set on the command line.
+
+# ---------------------------------------------------------------------------
+# ServiceAccount & RBAC
+# Dedicated ServiceAccount plus a Role/RoleBinding in the sandbox namespace so
+# the agent can manage SandboxClaims.
+# ---------------------------------------------------------------------------
+serviceAccount:
+  create: true
+  sandboxAccess: true
+
+# ---------------------------------------------------------------------------
+# Coding Agent
+# ---------------------------------------------------------------------------
+agent:
+  replicaCount: 1
+
+  image:
+    repository: coding-agent
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  # LLM configuration – openaiApiKey is required
+  openaiApiKey: ""            # REQUIRED – set via --set or a separate secret values file
+  openaiBaseUrl: "http://litellm.litellm.svc.cluster.local:4000/v1"   # Intel Inference Toolkit LiteLLM
+  # Model ID registered in LiteLLM; must support tool calling.
+  modelName: "qwen2-5-coder-14b"
+
+  # Bearer token required on the agent API (/v1/*). deploy.sh generates one.
+  devuiAuthToken: ""          # REQUIRED
+
+  # Proxy bypass list – cluster-internal traffic must not go through the corporate proxy
+  noProxy: "localhost,127.0.0.1,intel.com,.svc,.svc.cluster.local,.default.svc.cluster.local,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+
+  # Working directory inside the container (must match Dockerfile ENV)
+  workspaceDir: /app/workspace
+
+  # Agent Sandbox (Intel Agent Toolkit, fixed namespace 'agent-sandbox-system').
+  # Verify: kubectl get sandboxtemplate,sandboxwarmpool -n agent-sandbox-system
+  sandboxNamespace: "agent-sandbox-system"
+  sandboxTemplate: "python-sandbox-template"
+  sandboxWarmPool: "python-pool"          # warm pool to adopt sandboxes from
+  sandboxRouterUrl: "http://sandbox-router-svc.agent-sandbox-system.svc.cluster.local:8080"
+  sandboxRouterToken: ""                   # secret agent-sandbox-system/sandbox-router-auth
+
+  # Ray distributed execution (optional)
+  ray:
+    enabled: false
+    address: ""   # e.g. ray://ray-cluster-head-svc.ray-system.svc.cluster.local:10001 (kuberay_enabled)
+
+  # Langfuse observability (optional)
+  langfuse:
+    publicKey: ""
+    secretKey: ""
+    host: ""                  # e.g. http://langfuse-web.langfuse.svc.cluster.local:3000
+    enableSensitiveData: "true"
+
+  service:
+    type: ClusterIP
+    port: 8090
+
+  # Workspace PersistentVolumeClaim
+  workspace:
+    size: 5Gi
+    storageClassName: ""
+
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+  # Node affinity. Empty = schedule anywhere (multi-node clusters installed by Toolkit Manager
+  # label nodes workload-class=platform|inference if you want a preference).
+  affinity: {}
+
+# ---------------------------------------------------------------------------
+# Redis URL — shared Redis from Intel Agent Toolkit (namespace 'redis').
+# It requires auth: deploy.sh reads the full URL from the
+# redis-stack-server-credentials secret (key REDIS_URL).
+# ---------------------------------------------------------------------------
+redisUrl: "redis://redis-stack-server.redis.svc.cluster.local:6379"
+
+# ---------------------------------------------------------------------------
+# HTTPRoute (Envoy Gateway / Gateway API)
+# The platform exposes services through the shared Envoy Gateway 'eg-gateway'
+# (namespace envoy-gateway-system); TLS is terminated there with the wildcard
+# *.<base_domain_name> certificate, so the chart needs no TLS secret.
+# ---------------------------------------------------------------------------
+httpRoute:
+  enabled: false
+  host: ""            # e.g. coding-agent-langgraph.solutions.ai
+  path: /
+  timeout: ""         # request timeout, e.g. "900s"; empty = gateway default (600s)
+  gateway:
+    name: eg-gateway
+    namespace: envoy-gateway-system
+    sectionName: https
+  # The gateway-wide SecurityPolicy validates a LiteLLM key on every request.
+  # The agent API enforces its own bearer token (DEVUI_AUTH_TOKEN), so by
+  # default the chart ships an empty route-level SecurityPolicy that opts out.
+  bypassGatewayAuth: true
+
+# ---------------------------------------------------------------------------
+# Chart-wide overrides
+# ---------------------------------------------------------------------------
+nameOverride: ""
+fullnameOverride: ""

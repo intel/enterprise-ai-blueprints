@@ -4,27 +4,28 @@
 # =============================================================================
 # deploy.sh — One-click deployer for the Coding Agent use case
 #
-# Deploys the Coding Agent into an existing Agentic AI Stack cluster using Helm.
+# Deploys the Coding Agent onto Intel® Agent Toolkit (installed by Toolkit
+# Manager release-1.2) using Helm.
 #
 # Prerequisites:
-#   • Agentic AI Stack is running (see ../../docs/agentic-stack-setup.md)
-#   • kubectl is configured and pointing at your cluster
+#   • Intel Agent Toolkit is installed with Toolkit Manager (see ../../docs/toolkit-manager-setup.md)
+#   • kubectl is configured and pointing at your cluster (env/<env>/kubeconfig.yaml)
 #   • helm is installed
 #
 # Usage:
 #   ./deploy.sh
 #
-# Environment variables (all optional — script prompts if not set):
-#   CLUSTER_URL         Base domain of the stack, e.g. api.example.com
-#   OPENAI_API_KEY      LiteLLM / GenAI Gateway API key
-#   MODEL_NAME          Model ID in LiteLLM, e.g. Qwen/Qwen3-Coder-30B-A3B-Instruct
-#   OPENAI_BASE_URL     Override LiteLLM URL (default: https://<CLUSTER_URL>/v1)
-#   REDIS_URL           Override Redis URL (default: in-cluster redis)
+# Environment variables (all optional — auto-discovered from the cluster or prompted):
+#   CLUSTER_URL         Toolkit Manager base_domain_name, e.g. solutions.ai (from eg-gateway)
+#   OPENAI_API_KEY      LiteLLM key (default: litellm-master-key; prefer a virtual key)
+#   MODEL_NAME          Model ID in LiteLLM, e.g. qwen2-5-coder-14b
+#   OPENAI_BASE_URL     Override LiteLLM URL (default: in-cluster litellm.litellm:4000)
+#   REDIS_URL           Override Redis URL (default: redis-stack-server-credentials)
 #   SANDBOX_ROUTER_URL  Override sandbox router URL (default: in-cluster router)
-#   NAMESPACE           Kubernetes namespace (default: coding-agent)
-#   INGRESS_HOST        Ingress hostname (default: coding-agent.<CLUSTER_URL>)
-#   CERT_FILE           Path to TLS certificate PEM (optional)
-#   KEY_FILE            Path to TLS private key PEM (optional)
+#   LANGFUSE_*          Langfuse keys/host (default: langfuse/langfuse-secrets)
+#   NAMESPACE           Kubernetes namespace (default: coding-agent-maf)
+#   INGRESS_HOST        HTTPRoute hostname (default: coding-agent.<CLUSTER_URL>)
+#   PATCH_LITELLM_AUTHZ true = add NAMESPACE to LiteLLM's AuthorizationPolicy directly
 #   DEVUI_AUTH_TOKEN    Auth token for DevUI web interface (auto-generated if unset)
 # =============================================================================
 set -euo pipefail
@@ -43,6 +44,9 @@ info()    { echo -e "${CYAN}[INFO]${NC}  $*"; }
 success() { echo -e "${GREEN}[OK]${NC}    $*"; }
 warn()    { echo -e "${YELLOW}[WARN]${NC}  $*"; }
 die()     { echo -e "${RED}[ERROR]${NC} $*" >&2; exit 1; }
+
+# shellcheck source=scripts/toolkit-manager-lib.sh
+source "${SCRIPT_DIR}/../../scripts/toolkit-manager-lib.sh"
 
 # ---------------------------------------------------------------------------
 # Dependency check
@@ -132,11 +136,16 @@ echo "  Coding Agent — Deployment"
 echo "============================================================"
 echo ""
 
+tm_discover_base_domain
+tm_discover_litellm_key
+tm_discover_langfuse
+
 prompt_if_empty CLUSTER_URL \
-  "Agentic Stack base domain (e.g. api.example.com)"
+  "Toolkit Manager base_domain_name (e.g. solutions.ai)"
+[[ -n "${CLUSTER_URL}" ]] || die "CLUSTER_URL (Toolkit Manager base_domain_name) is required."
 
 prompt_secret_if_empty OPENAI_API_KEY \
-  "LiteLLM / GenAI Gateway API key (OPENAI_API_KEY)"
+  "LiteLLM API key (OPENAI_API_KEY)"
 
 prompt_if_empty MODEL_NAME \
   "Model name registered in the gateway (must support tool calling)"
@@ -144,13 +153,13 @@ prompt_if_empty MODEL_NAME \
 # Namespace defaults to the use case name; Helm release/Service stay "coding-agent".
 NAMESPACE="${NAMESPACE:-coding-agent-maf}"
 INGRESS_HOST="${INGRESS_HOST:-coding-agent.${CLUSTER_URL}}"
-OPENAI_BASE_URL="${OPENAI_BASE_URL:-http://genai-gateway-service.genai-gateway.svc.cluster.local:4000/v1}"
+OPENAI_BASE_URL="${OPENAI_BASE_URL:-${TM_LITELLM_URL}}"
 SANDBOX_NAMESPACE="${SANDBOX_NAMESPACE:-agent-sandbox-system}"
 SANDBOX_WARMPOOL="${SANDBOX_WARMPOOL:-python-pool}"
 SANDBOX_ROUTER_URL="${SANDBOX_ROUTER_URL:-http://sandbox-router-svc.${SANDBOX_NAMESPACE}.svc.cluster.local:8080}"
 DEVUI_AUTH_TOKEN="${DEVUI_AUTH_TOKEN:-$(openssl rand -hex 24 2>/dev/null || echo "changeme")}"
 
-# Authenticated Redis URL from the toolkit's credentials secret (the shared Redis
+# Authenticated Redis URL from the agent-toolkit's credentials secret (the shared Redis
 # needs a password). Falls back to a passwordless URL if the secret isn't found.
 if [[ -z "${REDIS_URL:-}" ]]; then
   REDIS_URL="$(kubectl get secret -n redis redis-stack-server-credentials \
@@ -181,6 +190,7 @@ echo "  SANDBOX_NAMESPACE  = ${SANDBOX_NAMESPACE}"
 echo "  SANDBOX_WARMPOOL   = ${SANDBOX_WARMPOOL}"
 echo "  SANDBOX_ROUTER_URL = ${SANDBOX_ROUTER_URL}"
 echo "  SANDBOX_ROUTER_TOKEN = $([[ -n "${SANDBOX_ROUTER_TOKEN}" ]] && echo '****(set)' || echo '(none)')"
+echo "  LANGFUSE_HOST      = ${LANGFUSE_HOST:-(tracing disabled)}"
 echo ""
 
 # ---------------------------------------------------------------------------
@@ -189,41 +199,11 @@ echo ""
 build_images
 
 # ---------------------------------------------------------------------------
-# Namespace
+# Namespace (PSS restricted + Istio ambient) and LiteLLM access
 # ---------------------------------------------------------------------------
-info "Ensuring namespace '${NAMESPACE}' exists..."
-kubectl create namespace "${NAMESPACE}" --dry-run=client -o yaml | kubectl apply -f - >/dev/null
-
-# ---------------------------------------------------------------------------
-# TLS secret
-# ---------------------------------------------------------------------------
-# Option 1: pass TLS_SECRET_NAME directly to reference an existing cluster secret
-# Option 2: pass CERT_FILE + KEY_FILE to create a new secret from files
-# Option 3: set neither — ingress is created without TLS
-if [[ -z "${TLS_SECRET_NAME:-}" ]]; then
-  if [[ -n "${CERT_FILE:-}" && -n "${KEY_FILE:-}" ]]; then
-    TLS_SECRET_NAME="coding-agent-tls"
-    if kubectl get secret "${TLS_SECRET_NAME}" -n "${NAMESPACE}" &>/dev/null; then
-      info "TLS secret '${TLS_SECRET_NAME}' already exists — skipping."
-    else
-      [[ -f "${CERT_FILE}" ]] || die "CERT_FILE '${CERT_FILE}' not found."
-      [[ -f "${KEY_FILE}" ]]  || die "KEY_FILE '${KEY_FILE}' not found."
-      kubectl create secret tls "${TLS_SECRET_NAME}" \
-        --cert="${CERT_FILE}" --key="${KEY_FILE}" -n "${NAMESPACE}"
-      success "Created TLS secret '${TLS_SECRET_NAME}'."
-    fi
-  else
-    info "No TLS_SECRET_NAME or CERT_FILE/KEY_FILE set. Ingress will be created without TLS."
-    TLS_SECRET_NAME=""
-  fi
-else
-  if ! kubectl get secret "${TLS_SECRET_NAME}" -n "${NAMESPACE}" &>/dev/null; then
-    warn "TLS_SECRET_NAME '${TLS_SECRET_NAME}' not found in namespace '${NAMESPACE}'. TLS will be disabled."
-    TLS_SECRET_NAME=""
-  else
-    info "Using existing TLS secret '${TLS_SECRET_NAME}'."
-  fi
-fi
+# TLS is terminated at the platform gateway — no per-app certificate needed.
+tm_prepare_namespace "${NAMESPACE}"
+tm_check_litellm_access "${NAMESPACE}"
 
 # ---------------------------------------------------------------------------
 # Helm deploy
@@ -246,18 +226,11 @@ HELM_ARGS=(
   --set "agent.sandboxRouterUrl=${SANDBOX_ROUTER_URL}"
   --set "agent.sandboxRouterToken=${SANDBOX_ROUTER_TOKEN}"
   --set "redisUrl=${REDIS_URL}"
-  --set "ingress.enabled=true"
-  --set "ingress.host=${INGRESS_HOST}"
+  --set "httpRoute.enabled=true"
+  --set "httpRoute.host=${INGRESS_HOST}"
   --wait
   --timeout 5m
 )
-
-if [[ -n "${TLS_SECRET_NAME}" ]]; then
-  HELM_ARGS+=(
-    --set "ingress.tls.enabled=true"
-    --set "ingress.tls.secretName=${TLS_SECRET_NAME}"
-  )
-fi
 
 # Langfuse tracing (optional) — passed only when keys are provided.
 if [[ -n "${LANGFUSE_PUBLIC_KEY:-}" && -n "${LANGFUSE_SECRET_KEY:-}" ]]; then
@@ -280,6 +253,7 @@ success "Coding Agent deployed — namespace: ${NAMESPACE}"
 echo ""
 info "Access the Coding Agent:"
 info "  https://${INGRESS_HOST}"
+tm_print_gateway_hint "${INGRESS_HOST}"
 info "  (or locally: kubectl port-forward -n ${NAMESPACE} svc/coding-agent 8090:8090 → http://localhost:8090)"
 info ""
 info "  DevUI login token (enter in the browser login prompt):"
