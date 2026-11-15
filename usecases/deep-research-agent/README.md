@@ -281,6 +281,7 @@ Valid module names: `classify`, `cat1_answer`, `cat2_answer`, `agent`,
 | `TAVILY_API_KEY` | `agent.search.tavilyApiKey` | — **(required)** | Tavily key |
 | `TAVILY_SEARCH_DEPTH` | `agent.search.searchDepth` | `advanced` | `basic` or `advanced` |
 | `TAVILY_MAX_RESULTS` | `agent.search.maxResults` | `5` | Results per query |
+| `EXA_API_KEY` | `agent.search.exaApiKey` | *(empty)* | Optional provider |
 | `SERPER_API_KEY` | `agent.search.serperApiKey` | *(empty)* | Optional second provider |
 
 ### Research pipeline
@@ -326,6 +327,7 @@ agent:
     model: "qwen2-5-coder-14b"             # required — must support tool calling
   search:
     tavilyApiKey: "tvly-your-key"          # required
+    exaApiKey: ""                          # optional
     serperApiKey: ""                       # optional
   apiKeys: ""                              # X-API-Key on /api/* — breaks the bundled UI
   evalDashboard:

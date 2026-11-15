@@ -3,12 +3,14 @@
 
 from search_providers.base import SearchProvider
 from search_providers.tavily import TavilyProvider
+from search_providers.exa import ExaProvider
 from search_providers.serper import SerperProvider
 from search_providers.composite import CompositeSearchProvider, create_search_provider
 
 __all__ = [
     "SearchProvider",
     "TavilyProvider",
+    "ExaProvider",
     "SerperProvider",
     "CompositeSearchProvider",
     "create_search_provider",

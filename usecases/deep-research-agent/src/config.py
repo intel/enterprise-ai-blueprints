@@ -42,6 +42,9 @@ class Settings(BaseSettings):
     tavily_search_depth: str = "advanced"
     tavily_max_results: int = 5
 
+    # Exa (optional search provider)
+    exa_api_key: str = ""
+
     # Serper (optional second search provider)
     serper_api_key: str = ""
 
