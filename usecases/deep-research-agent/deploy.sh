@@ -23,6 +23,7 @@
 #   LLM_MODEL           Model ID in LiteLLM (alias MODEL_NAME) — MUST support tool calling
 #   LLM_BASE_URL        Override LiteLLM URL (alias OPENAI_BASE_URL; default: in-cluster)
 #   TAVILY_API_KEY      Tavily search key (REQUIRED)
+#   EXA_API_KEY         Optional search provider (https://exa.ai/)
 #   SERPER_API_KEY      Optional second search provider (https://serper.dev/)
 #   SECONDARY_LLM_*     Optional secondary model slot for lightweight modules
 #   API_KEYS            Optional X-API-Key list for /api/* (breaks the bundled web UI)
@@ -185,7 +186,7 @@ echo "  INGRESS_HOST       = ${INGRESS_HOST}"
 echo "  LLM_BASE_URL       = ${LLM_BASE_URL}"
 echo "  LLM_MODEL          = ${LLM_MODEL}"
 echo "  SECONDARY_LLM      = ${SECONDARY_LLM_MODEL:-(none)}"
-echo "  SEARCH             = tavily$([[ -n "${SERPER_API_KEY:-}" ]] && echo ' + serper')"
+echo "  SEARCH             = tavily$([[ -n "${EXA_API_KEY:-}" ]] && echo ' + exa')$([[ -n "${SERPER_API_KEY:-}" ]] && echo ' + serper')"
 echo "  API_KEYS           = $([[ -n "${API_KEYS:-}" ]] && echo '****(set — web UI will get 401)' || echo '(open)')"
 echo ""
 
@@ -221,6 +222,7 @@ HELM_ARGS=(
   --set "agent.secondaryLlm.model=${SECONDARY_LLM_MODEL:-}"
   --set-string "agent.secondaryLlm.modules=${SECONDARY_LLM_MODULES:-}"
   --set-string "agent.search.tavilyApiKey=${TAVILY_API_KEY}"
+  --set-string "agent.search.exaApiKey=${EXA_API_KEY:-}"
   --set-string "agent.search.serperApiKey=${SERPER_API_KEY:-}"
   --set-string "agent.apiKeys=${API_KEYS:-}"
   --set "agent.evalDashboard.enabled=${EVAL_DASHBOARD_ENABLED}"

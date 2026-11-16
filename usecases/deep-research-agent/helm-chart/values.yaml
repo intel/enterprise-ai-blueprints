@@ -38,9 +38,10 @@ agent:
 
   # --- Web search ------------------------------------------------------------
   # tavilyApiKey is required — without it the agent can only answer from
-  # parametric knowledge. serperApiKey is an optional second provider.
+  # parametric knowledge. serperApiKey and exaApiKey are optional providers.
   search:
     tavilyApiKey: ""
+    exaApiKey: ""
     serperApiKey: ""
     searchDepth: "advanced"
     maxResults: 5

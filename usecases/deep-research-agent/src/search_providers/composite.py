@@ -11,6 +11,7 @@ from config import settings
 from models import SearchResult
 from search_providers.base import SearchProvider
 from search_providers.tavily import TavilyProvider
+from search_providers.exa import ExaProvider
 from search_providers.serper import SerperProvider
 
 logger = logging.getLogger(__name__)
@@ -85,10 +86,13 @@ def create_search_provider() -> CompositeSearchProvider:
             )
         )
 
+    if settings.exa_api_key:
+        providers.append(ExaProvider(api_key=settings.exa_api_key))
+
     if settings.serper_api_key:
         providers.append(SerperProvider(api_key=settings.serper_api_key))
 
     if not providers:
-        raise ValueError("No search provider configured. Set TAVILY_API_KEY or SERPER_API_KEY.")
+        raise ValueError("No search provider configured. Set TAVILY_API_KEY, EXA_API_KEY or SERPER_API_KEY.")
 
     return CompositeSearchProvider(providers)
