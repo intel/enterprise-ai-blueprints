@@ -118,6 +118,26 @@ tm_check_litellm_access() {
   warn "Or re-run with PATCH_LITELLM_AUTHZ=true to patch the policy directly (temporary)."
 }
 
+# Check that a Model Manager model is deployed and Ready (LLMInferenceService <name> in
+# llm-inference). Best-effort: warns when it is missing or not Ready, never fails the deploy.
+#   tm_check_model <model-name> [<namespace>]
+tm_check_model() {
+  local model="$1" ns="${2:-llm-inference}" ready
+  kubectl get crd llminferenceservices.serving.kserve.io &>/dev/null || return 0
+  if ! kubectl get llminferenceservice "${model}" -n "${ns}" &>/dev/null; then
+    warn "Model '${model}' is not deployed in '${ns}'. Deploy it with Model Manager:"
+    warn "  ./model-manager deploy ${model} --wait   (in your enterprise-ai-solutions checkout)"
+    return 0
+  fi
+  ready="$(kubectl get llminferenceservice "${model}" -n "${ns}" \
+    -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || true)"
+  if [[ "${ready}" == "True" ]]; then
+    success "Model '${model}' is deployed and Ready (${ns})."
+  else
+    warn "Model '${model}' exists in '${ns}' but is not Ready yet (kubectl get llminferenceservice -n ${ns})."
+  fi
+}
+
 # Print how to reach a host published on the platform gateway.
 tm_print_gateway_hint() {
   local host="$1" ip

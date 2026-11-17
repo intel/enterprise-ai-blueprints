@@ -1,0 +1,208 @@
+{{- $gate := .Values.gate.enabled -}}
+{{- $agentPort := ternary .Values.gate.agentPort 8090 $gate -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "unified-decision-gate.fullname" . }}
+  labels:
+    {{- include "unified-decision-gate.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.agent.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "unified-decision-gate.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+      labels:
+        {{- include "unified-decision-gate.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ if .Values.serviceAccount.create }}{{ include "unified-decision-gate.fullname" . }}{{ else }}default{{ end }}
+      # Pod Security Standard 'restricted' (the platform enforces PSS). UID/GID 10001 matches the
+      # numeric user baked into the agent and MCP images; the gate's image runs as 10002 (its own
+      # securityContext below), and fsGroup keeps its telemetry volume writable.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      {{- with .Values.agent.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        {{- if $gate }}
+        # --- The gate: the pod's front door on {{ .Values.gate.port }} ----------------
+        # Owns the port named "http", so the Service and the HTTPRoute reach the gate, not the
+        # agent. Talks to the agent over loopback, and to System-1 on the inference AI gateway.
+        - name: gate
+          image: "{{ .Values.gate.image.repository }}:{{ .Values.gate.image.tag }}"
+          imagePullPolicy: {{ .Values.gate.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.gate.port }}
+              protocol: TCP
+          env:
+            - name: GATE_PORT
+              value: {{ .Values.gate.port | quote }}
+            - name: AGENT_URL
+              value: "http://localhost:{{ $agentPort }}"
+            # System-1: a structured-decisions model on vLLM (/v1/systemone), deployed by Model Manager.
+            - name: SYSTEM1_URL
+              value: {{ required "gate.system1Url is required: the vLLM serving System-1" .Values.gate.system1Url | quote }}
+            - name: SYSTEM1_MODEL
+              value: {{ .Values.gate.system1Model | quote }}
+            - name: SYSTEM1_TIMEOUT_S
+              value: {{ .Values.gate.system1TimeoutS | quote }}
+            - name: SYSTEM1_MIN_LABEL_MASS
+              value: {{ .Values.gate.minLabelMass | quote }}
+            - name: GATE_ENABLED
+              value: {{ .Values.gate.system1Enabled | quote }}
+            - name: GATE_SHADOW_MODE
+              value: {{ .Values.gate.shadowMode | quote }}
+            - name: SYSTEM1_YES_MIN
+              value: {{ .Values.gate.yesMin | quote }}
+            - name: SYSTEM1_NO_MAX
+              value: {{ .Values.gate.noMax | quote }}
+            - name: SYSTEM1_MAX_P_ACTION
+              value: {{ .Values.gate.maxPAction | quote }}
+            - name: GATE_DEBUG_HEADERS
+              value: {{ .Values.gate.debugHeaders | quote }}
+            - name: GATE_PROXY_DEVUI
+              value: {{ .Values.gate.proxyDevui | quote }}
+            - name: GATE_LOG_QUESTION_TEXT
+              value: {{ .Values.gate.logQuestionText | quote }}
+            - name: GATE_TELEMETRY_PATH
+              value: /app/telemetry/gate.jsonl
+            - name: no_proxy
+              value: {{ .Values.agent.noProxy | quote }}
+            - name: NO_PROXY
+              value: {{ .Values.agent.noProxy | quote }}
+            # Secrets: the gate enforces the same DevUI token the agent does, because questions
+            # it answers itself never reach DevUI.
+            - name: DEVUI_AUTH_TOKEN
+              valueFrom: {secretKeyRef: {name: {{ include "unified-decision-gate.fullname" . }}-secret, key: DEVUI_AUTH_TOKEN}}
+            - name: GATE_TELEMETRY_HASH_KEY
+              valueFrom: {secretKeyRef: {name: {{ include "unified-decision-gate.fullname" . }}-gate-secret, key: GATE_TELEMETRY_HASH_KEY}}
+            - name: SYSTEM1_API_KEY
+              valueFrom: {secretKeyRef: {name: {{ include "unified-decision-gate.fullname" . }}-gate-secret, key: SYSTEM1_API_KEY}}
+          readinessProbe:
+            httpGet:
+              path: /live
+              port: http
+            timeoutSeconds: 5          # /live never calls System-1: the gate fails open without it
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /live
+              port: http
+            timeoutSeconds: 5
+            initialDelaySeconds: 15
+            periodSeconds: 30
+            failureThreshold: 3
+          volumeMounts:
+            - name: gate-telemetry
+              mountPath: /app/telemetry
+          resources:
+            {{- toYaml .Values.gate.resources | nindent 12 }}
+          # Inlined literal, as for the MCP sidecar. runAsUser matches gateuser (Dockerfile.gate).
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 10002
+            capabilities:
+              drop:
+                - ALL
+        {{- end }}{{/* gate.enabled */}}
+        # --- The agent (DevUI on {{ $agentPort }}) ------------------------------------------
+        - name: banking-assistant
+          image: "{{ .Values.agent.image.repository }}:{{ .Values.agent.image.tag }}"
+          imagePullPolicy: {{ .Values.agent.image.pullPolicy }}
+          ports:
+            - name: {{ ternary "agent" "http" $gate }}
+              containerPort: {{ $agentPort }}
+              protocol: TCP
+          env:
+            - name: DEVUI_PORT
+              value: {{ $agentPort | quote }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "unified-decision-gate.fullname" . }}-config
+            - secretRef:
+                name: {{ include "unified-decision-gate.fullname" . }}-secret
+          livenessProbe:
+            tcpSocket:
+              port: {{ ternary "agent" "http" $gate }}
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            failureThreshold: 3
+          readinessProbe:
+            tcpSocket:
+              port: {{ ternary "agent" "http" $gate }}
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.agent.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+        # --- Container 2: the banking MCP server sidecar (Streamable HTTP 8000)
+        - name: banking-mcp
+          image: "{{ .Values.mcp.image.repository }}:{{ .Values.mcp.image.tag }}"
+          imagePullPolicy: {{ .Values.mcp.image.pullPolicy }}
+          ports:
+            - name: mcp
+              containerPort: {{ .Values.mcp.port }}
+              protocol: TCP
+          env:
+            - name: MCP_HOST
+              value: "0.0.0.0"
+            - name: MCP_PORT
+              value: {{ .Values.mcp.port | quote }}
+          readinessProbe:
+            # FastMCP exposes no /health endpoint — use a TCP check.
+            tcpSocket:
+              port: mcp
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            tcpSocket:
+              port: mcp
+            initialDelaySeconds: 15
+            periodSeconds: 30
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.mcp.resources | nindent 12 }}
+          # Inlined literal (not toYaml .Values...) so static IaC scanners can
+          # verify the hardening; the MCP server needs no write access or privileges.
+          # runAsUser matches the image's numeric mcpuser UID (Dockerfile.mcp).
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 10001
+            capabilities:
+              drop:
+                - ALL
+      {{- if $gate }}
+      volumes:
+        - name: gate-telemetry
+          {{- if .Values.gate.telemetry.existingClaim }}
+          persistentVolumeClaim:
+            claimName: {{ .Values.gate.telemetry.existingClaim }}
+          {{- else }}
+          emptyDir:
+            sizeLimit: {{ .Values.gate.telemetry.sizeLimit }}
+          {{- end }}
+      {{- end }}

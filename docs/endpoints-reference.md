@@ -24,6 +24,8 @@ the same value the deploy scripts call `CLUSTER_URL`.
 | **Banking Assistant** | `http://banking-assistant.banking-assistant.svc.cluster.local:8090` | `https://banking-assistant.<base>` |
 | **Coding Agent (LangGraph)** | `http://coding-agent-langgraph.coding-agent.svc.cluster.local:8090` | `https://coding-agent-langgraph.<base>` |
 | **Customer Support Agent** | `http://customer-support-agent.customer-support-agent.svc.cluster.local:8501` (UI) / `:8502` (API) | `https://customer-support-agent.<base>` (`/api`, `/v1` → API; `/` → UI) |
+| **Unified Decision Gate** | `http://unified-decision-gate.unified-decision-gate.svc.cluster.local:8090` | `https://unified-decision-gate.<base>` |
+| **System-1 (for the gate)** | `http://ai-gateway.envoy-gateway-system.svc.cluster.local/llm-inference/qwen3-0-6b-system1` (`POST /v1/systemone`) | *(in-cluster only)* |
 | **Deep Research Agent** | `http://deep-research-agent.deep-research-agent.svc.cluster.local:8081` (dashboard `:8082`) | `https://deep-research-agent.<base>` (optional `https://deep-research-agent-dashboard.<base>`) |
 
 Reserved platform hostnames (do not reuse for a blueprint): `inference.<base>`,

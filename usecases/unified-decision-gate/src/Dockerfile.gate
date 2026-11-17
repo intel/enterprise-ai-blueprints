@@ -1,0 +1,44 @@
+FROM python:3.12-slim
+# Explicit numeric UID/GID so Kubernetes can verify runAsNonRoot (a non-numeric USER cannot
+# be verified against runAsNonRoot: true) -- same pattern as Dockerfile.mcp.
+RUN groupadd -r -g 10002 gateuser && useradd -r -u 10002 -g gateuser -d /app gateuser
+
+WORKDIR /app
+
+# Proxy build args (passed via --build-arg; needed for pip in proxied envs)
+ARG http_proxy
+ARG https_proxy
+ARG HTTP_PROXY
+ARG HTTPS_PROXY
+ARG no_proxy
+ARG NO_PROXY
+
+# Install deps first (layer cache)
+COPY requirements-gate.txt .
+# apt-get upgrade patches base-image OS packages flagged by the image scan
+# (perl-base, gzip, libpcre2-8, libsqlite3, ...) to their fixed Debian versions.
+RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/* \
+    && pip install --no-cache-dir --upgrade "pip>=26.2" \
+    && pip install --no-cache-dir -r requirements-gate.txt
+
+# Copy the gate package
+COPY decision_gate/ ./decision_gate/
+
+# Telemetry sink: a writable directory the non-root user owns. Mount a volume over it to keep
+# the decision log across restarts.
+RUN mkdir -p /app/telemetry && chown -R gateuser:gateuser /app
+
+ENV HOME=/app \
+    PYTHONUNBUFFERED=1 \
+    GATE_PORT=8090
+
+USER gateuser
+
+EXPOSE 8090
+
+# /live, not /health: /health makes a real System-1 read, and the gate keeps serving (fail-open)
+# while System-1 is down, so that is no reason to mark the container unhealthy.
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+    CMD python3 -c "import urllib.request,os; urllib.request.urlopen('http://localhost:'+os.environ.get('GATE_PORT','8090')+'/live', timeout=5)"
+
+CMD ["python", "-m", "decision_gate.server"]

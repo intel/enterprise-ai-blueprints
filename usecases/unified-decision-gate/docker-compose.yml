@@ -1,0 +1,182 @@
+# Unified Decision Gate — Local Development Stack (no Kubernetes)
+# The gate + the example banking agent + its MCP server + Redis, in Docker. Both models stay on an
+# inference server you run yourself: the agent's LLM through a LiteLLM gateway, System-1
+# (Qwen3-0.6B on vLLM >= 0.32.0 with --logprobs-mode raw_logprobs) over vLLM's /v1/systemone.
+# On a Toolkit Manager platform use deploy.sh (Kubernetes) instead.
+#
+# Usage (settings: config/agent-config.env; README, Local Development):
+#   docker compose --env-file config/agent-config.env up -d --build --wait
+# or through the dispatcher:  ../../deploy-usecase.sh unified-decision-gate --mode docker
+
+name: unified-decision-gate
+
+services:
+
+  banking-mcp:
+    image: unified-decision-gate-mcp:latest
+    build:
+      context: ./src
+      dockerfile: Dockerfile.mcp
+      args:
+        http_proxy: "${http_proxy:-}"
+        https_proxy: "${https_proxy:-}"
+        no_proxy: "${no_proxy:-}"
+        HTTP_PROXY: "${HTTP_PROXY:-${http_proxy:-}}"
+        HTTPS_PROXY: "${HTTPS_PROXY:-${https_proxy:-}}"
+        NO_PROXY: "${NO_PROXY:-${no_proxy:-}}"
+    container_name: udg-mcp
+    environment:
+      MCP_HOST: "0.0.0.0"
+      MCP_PORT: "8000"
+    ports:
+      - "127.0.0.1:8000:8000"   # local debugging only: the tools are unauthenticated
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import socket; s=socket.socket(); s.connect(('localhost', 8000)); s.close()"]
+      interval: 15s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+
+  # The gate owns the external port 8090 that the agent used to serve, so the ingress,
+  # the Service, both example clients and every curl in the README keep working unchanged.
+  # The agent moves to 8091 on the host (still 8090 inside its own container).
+  gate:
+    image: unified-decision-gate-gate:latest
+    build:
+      context: ./src
+      dockerfile: Dockerfile.gate
+      args:
+        http_proxy: "${http_proxy:-}"
+        https_proxy: "${https_proxy:-}"
+        no_proxy: "${no_proxy:-}"
+        HTTP_PROXY: "${HTTP_PROXY:-${http_proxy:-}}"
+        HTTPS_PROXY: "${HTTPS_PROXY:-${https_proxy:-}}"
+        NO_PROXY: "${NO_PROXY:-${no_proxy:-}}"
+    container_name: udg-gate
+    ports:
+      - "8090:8090"
+    environment:
+      AGENT_URL: "http://banking-assistant:8090"
+      # The gate enforces the same DevUI token itself: requests it answers on the cheap path
+      # never reach DevUI, so without this the cheap path would accept any caller.
+      DEVUI_AUTH_TOKEN: "${DEVUI_AUTH_TOKEN:?set DEVUI_AUTH_TOKEN in .env or config/agent-config.env}"
+      # System-1: a structured-decisions model on vLLM (POST /v1/systemone).
+      # SYSTEM1_URL is that vLLM server's base URL, without /v1; a host IP, not localhost.
+      # Unset, every question fails open to the agent .
+      SYSTEM1_URL: "${SYSTEM1_URL:-}"
+      SYSTEM1_MODEL: "${SYSTEM1_MODEL:-Qwen/Qwen3-0.6B}"
+      SYSTEM1_API_KEY: "${SYSTEM1_API_KEY:-}"
+      SYSTEM1_TIMEOUT_S: "${SYSTEM1_TIMEOUT_S:-2.0}"
+      # Escalate when vLLM's label_mass for a question is below this (0 = off). Unmeasured: fit it.
+      SYSTEM1_MIN_LABEL_MASS: "${SYSTEM1_MIN_LABEL_MASS:-0}"
+      # Display cut-offs on P(yes): "Yes." at or above SYSTEM1_YES_MIN, "No." at or below SYSTEM1_NO_MAX,
+      # the agent in between. Fitted for Qwen3-0.6B on 200 labelled banking questions (cut 0.9929,
+      # +-0.0023 unsure band for run-to-run noise); not load-proof. See config/agent-config.env.
+      SYSTEM1_YES_MIN: "${SYSTEM1_YES_MIN:-0.9952}"
+      SYSTEM1_NO_MAX: "${SYSTEM1_NO_MAX:-0.9906}"
+      # The "is this a request to DO something" veto (2nd layer). 1.0 = off: Qwen3-0.6B's P(action)
+      # is ~1 on every question; the text rules still send explicit requests to the agent.
+      SYSTEM1_MAX_P_ACTION: "${SYSTEM1_MAX_P_ACTION:-1.0}"
+      # ON by default, as in Helm: log the decision, always serve from the agent. The action veto is
+      # off and the cut-offs are fitted for the banking example; turn it off only after measuring.
+      GATE_SHADOW_MODE: "${GATE_SHADOW_MODE:-true}"
+      # Master switch. false = System-1 is never asked; every question goes to the LLM agent.
+      GATE_ENABLED: "${GATE_ENABLED:-true}"
+      # X-Gate-* response headers (route, reason, scores). Off by default; the benchmarks turn it on.
+      GATE_DEBUG_HEADERS: "${GATE_DEBUG_HEADERS:-false}"
+      GATE_TELEMETRY_PATH: "/app/telemetry/gate.jsonl"
+      # HMAC key for question hashes; set it in the settings file so repeats stay linkable across restarts.
+      GATE_TELEMETRY_HASH_KEY: "${GATE_TELEMETRY_HASH_KEY:-}"
+      # Customer text is OFF by default; turn on only with the deployment owner's agreement.
+      GATE_LOG_QUESTION_TEXT: "${GATE_LOG_QUESTION_TEXT:-false}"
+      # The text rules file (default: the one in the image, src/decision_gate/text_rules.json); point it at
+      # a file you mount into this container to use your own rules without rebuilding.
+      GATE_TEXT_RULES: "${GATE_TEXT_RULES:-}"
+      # The vLLM serving System-1 must bypass the proxy: SYSTEM1_HOST is the host part of SYSTEM1_URL
+      # (export it when running docker compose).
+      no_proxy: "${no_proxy:-},banking-assistant,${SYSTEM1_HOST:-},redis-stack,localhost,127.0.0.1"
+      NO_PROXY: "${NO_PROXY:-${no_proxy:-}},banking-assistant,${SYSTEM1_HOST:-},redis-stack,localhost,127.0.0.1"
+    volumes:
+      - gate-telemetry:/app/telemetry
+    depends_on:
+      banking-assistant:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8090/live', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      start_period: 15s
+      retries: 3
+
+  banking-assistant:
+    image: unified-decision-gate-agent:latest
+    build:
+      context: ./src
+      dockerfile: Dockerfile
+      args:
+        http_proxy: "${http_proxy:-}"
+        https_proxy: "${https_proxy:-}"
+        no_proxy: "${no_proxy:-}"
+        HTTP_PROXY: "${HTTP_PROXY:-${http_proxy:-}}"
+        HTTPS_PROXY: "${HTTPS_PROXY:-${https_proxy:-}}"
+        NO_PROXY: "${NO_PROXY:-${no_proxy:-}}"
+    container_name: udg-agent
+    ports:
+      # The gate owns 8090 on the host now; the agent stays on 8090 INSIDE the container and is
+      # published on 8091 so it can still be reached directly for debugging.
+      - "8091:8090"
+    environment:
+      MCP_SERVER_URL: "http://banking-mcp:8000/mcp"
+      # The LiteLLM gateway (see the top of this file). The agent reads the OpenAI-style names.
+      OPENAI_BASE_URL: "${LITELLM_URL:-}"
+      OPENAI_API_KEY: "${LITELLM_API_KEY:-not-needed}"
+      MODEL_NAME: "${MODEL_NAME:-Qwen/Qwen3-Coder-30B-A3B-Instruct}"
+      # DevUI refuses to start on a non-loopback host without a token, so compose fails fast
+      # if it is unset. Put it in .env or config/agent-config.env. Clients send it as a Bearer token;
+      # the gate passes their Authorization header through to the agent.
+      DEVUI_AUTH_TOKEN: "${DEVUI_AUTH_TOKEN:?set DEVUI_AUTH_TOKEN in .env or config/agent-config.env}"
+      REDIS_URL: "redis://redis-stack:6379"
+      ENABLE_MEMORY: "true"
+      http_proxy: "${http_proxy:-}"
+      https_proxy: "${https_proxy:-}"
+      # banking-mcp and redis-stack must resolve without the proxy, and so must the gateway:
+      # LITELLM_HOST is the host part of LITELLM_URL (export it yourself when
+      # running docker compose by hand). Without it the agent sends its gateway call to the
+      # proxy and every escalated question fails with a 502 while the containers look healthy.
+      no_proxy: "${no_proxy:-},${LITELLM_HOST:-},banking-mcp,redis-stack,localhost,127.0.0.1"
+      HTTP_PROXY: "${HTTP_PROXY:-${http_proxy:-}}"
+      HTTPS_PROXY: "${HTTPS_PROXY:-${https_proxy:-}}"
+      NO_PROXY: "${NO_PROXY:-${no_proxy:-}},${LITELLM_HOST:-},banking-mcp,redis-stack,localhost,127.0.0.1"
+    depends_on:
+      banking-mcp:
+        condition: service_healthy
+      redis-stack:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import socket; s=socket.socket(); s.connect(('localhost', 8090)); s.close()"]
+      interval: 30s
+      timeout: 10s
+      start_period: 15s
+      retries: 3
+
+  redis-stack:
+    image: redis/redis-stack-server:7.4.0-v8
+    container_name: udg-redis
+    ports:
+      - "127.0.0.1:${REDIS_HOST_PORT:-6379}:6379"   # local debugging only; set REDIS_HOST_PORT if 6379 is taken (e.g. by the agentic stack)
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  redis-data:
+  # The decision log (System-1's decision per request), kept across restarts.
+  gate-telemetry:

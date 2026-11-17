@@ -1,0 +1,199 @@
+# Default values for unified-decision-gate.
+# Override these in a values file or with --set on the command line.
+
+# ---------------------------------------------------------------------------
+# ServiceAccount
+# Dedicated ServiceAccount for the unified-decision-gate pod. No RBAC is needed —
+# unlike coding-agent there is no Kubernetes sandbox to manage.
+# ---------------------------------------------------------------------------
+serviceAccount:
+  create: true
+
+# ---------------------------------------------------------------------------
+# Banking Assistant agent (container 1)
+# ---------------------------------------------------------------------------
+agent:
+  replicaCount: 1
+
+  image:
+    repository: unified-decision-gate-agent   # Replace with your registry/image, e.g. ghcr.io/myorg/unified-decision-gate-agent
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  # LLM configuration – openaiApiKey is required
+  openaiApiKey: ""            # REQUIRED – set via --set or a separate secret values file
+  devuiAuthToken: ""          # REQUIRED – auth token for DevUI when bound to non-loopback host
+  openaiBaseUrl: "http://litellm.litellm.svc.cluster.local:4000/v1"   # Intel Inference Toolkit LiteLLM
+  # Langfuse observability (optional)
+  langfusePublicKey: ""
+  langfuseSecretKey: ""
+  langfuseHost: ""              # -> LANGFUSE_HOST, e.g. http://langfuse-web.langfuse.svc.cluster.local:3000
+  # "true" sends prompts and answers to Langfuse: fine for this synthetic demo data; set "false"
+  # for real customer data (the gate's own decision log keeps question text opt-in).
+  langfuseEnableSensitiveData: "true"
+  # modelName must be a model ID registered in LiteLLM and must support tool/function
+  # calling for the MCP tools to be invoked, e.g. qwen3-4b.
+  modelName: ""   # REQUIRED – set at deploy time
+
+  # URL of the banking MCP server. In the sidecar topology this is loopback.
+  mcpServerUrl: "http://localhost:8000/mcp"
+
+  # Enable text-only Redis conversational memory
+  enableMemory: "true"
+
+  # Proxy bypass list – cluster-internal traffic must not go through the corporate proxy
+  noProxy: "localhost,127.0.0.1,intel.com,.svc,.svc.cluster.local,.default.svc.cluster.local,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+
+  service:
+    type: ClusterIP
+    port: 8090
+    # nodePort: 30090   # Uncomment when type is NodePort
+
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+  # Node affinity. Multi-node clusters installed by Toolkit Manager label nodes
+  # workload-class=platform|inference.
+  # Empty = schedule anywhere. Example soft preference:
+  #   affinity:
+  #     nodeAffinity:
+  #       preferredDuringSchedulingIgnoredDuringExecution:
+  #         - weight: 50
+  #           preference:
+  #             matchExpressions:
+  #               - key: workload-class
+  #                 operator: In
+  #                 values: ["platform"]
+  affinity: {}
+
+# ---------------------------------------------------------------------------
+# Banking MCP server (container 2 — sidecar in the same pod)
+# Serves banking tools over Streamable HTTP on port 8000. Backed by synthetic
+# in-memory data only; not exposed via a Service (agent reaches it on loopback).
+# ---------------------------------------------------------------------------
+mcp:
+  image:
+    repository: unified-decision-gate-mcp   # Replace with your registry/image
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  port: 8000
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+
+  # Container hardening for the MCP sidecar is set as a literal securityContext
+  # directly in templates/deployment.yaml (so static IaC scanners can verify it).
+
+# ---------------------------------------------------------------------------
+# The gate (container 3) — the pod's front door when enabled.
+# It owns port 8090 (the Service's target) and the agent moves to 8091 inside the pod, so the
+# Service, the HTTPRoute and every client keep the same URL. It answers OpenAI chat completions,
+# enforces the DevUI token, and DISPLAYS System-1's yes/no to a banking question when System-1 is
+# confident; everything else is translated to the agent's Responses API.
+# ---------------------------------------------------------------------------
+gate:
+  # true (default): the gate container is the pod's front door. false deploys the agent ALONE: the
+  # Service then reaches DevUI directly, which serves the Responses API (/v1/responses) and NO
+  # /v1/chat/completions. To keep the chat API with System-1 switched off, use system1Enabled.
+  enabled: true
+  # false: System-1 is never asked; the gate sends every question to the agent (same chat API).
+  system1Enabled: true
+
+  # System-1: Qwen3-0.6B on vLLM >= 0.32.0 with --logprobs-mode raw_logprobs, deployed by Intel
+  # Inference Toolkit's Model Manager as the catalog model qwen3-0-6b-system1 (README, Deploy
+  # System-1). system1Url is its base URL without /v1: by default its route on the inference AI
+  # gateway (which schedules across replicas). system1Model is the name it is served under.
+  system1Url: "http://ai-gateway.envoy-gateway-system.svc.cluster.local/llm-inference/qwen3-0-6b-system1"
+  system1Model: "qwen3-0-6b-system1"
+  system1ApiKey: ""                 # the vLLM's --api-key, if it has one
+  system1TimeoutS: "2.0"
+  # Escalate when vLLM's label_mass for a question is below this; 0 = off. Unmeasured: fit it.
+  minLabelMass: "0"
+
+  image:
+    repository: unified-decision-gate-gate   # Replace with your registry/image
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  port: 8090
+  agentPort: 8091               # where the agent's DevUI moves when the gate is enabled
+
+  # The recommended first deployment: every decision is logged, every request is still served
+  # by the agent, so no customer-visible path changes. Turn off only after measuring.
+  shadowMode: true
+  # Display cut-offs on P(yes): "Yes." at or above yesMin, "No." at or below noMax, the agent in
+  # between. Fitted for Qwen3-0.6B on 200 labelled banking questions (cut 0.9929, +-0.0023 unsure
+  # band for run-to-run noise); not load-proof. Refit them on your own labelled questions before
+  # showing System-1's answers to customers.
+  yesMin: "0.9952"
+  noMax: "0.9906"
+  # Veto: escalate when P(the customer asks for something to be DONE) is above this. 1.0 = off:
+  # Qwen3-0.6B's P(action) is ~1 on every question.
+  maxPAction: "1.0"
+  # X-Gate-* response headers expose routing internals; keep off outside debugging.
+  debugHeaders: false
+  # Proxy DevUI's own routes (web UI, /v1/responses...) through the gate. /v1/responses
+  # bypasses System-1 and the decision log; set false if only chat completions should be reachable.
+  proxyDevui: true
+  # Customer text in the decision log is opt-in: agree it with the deployment owner first.
+  logQuestionText: false
+  telemetryHashKey: ""          # HMAC key for question hashes; set to link repeats across restarts
+
+  # The decision log. emptyDir loses it when the pod goes; name a PVC to keep it.
+  telemetry:
+    existingClaim: ""
+    sizeLimit: 1Gi
+
+  resources:                    # measured: ~45 MiB resident
+    requests:
+      cpu: 50m
+      memory: 96Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+  # Container hardening for the gate is a literal securityContext in templates/deployment.yaml.
+
+# ---------------------------------------------------------------------------
+# Redis URL — shared Redis from Intel Agent Toolkit (namespace 'redis').
+# It requires auth: deploy.sh reads the full URL, password included, from the
+# redis-stack-server-credentials secret (key REDIS_URL). It goes into the chart's Secret.
+# ---------------------------------------------------------------------------
+redisUrl: "redis://redis-stack-server.redis.svc.cluster.local:6379"
+
+# ---------------------------------------------------------------------------
+# HTTPRoute (Envoy Gateway / Gateway API)
+# The platform exposes services through the shared Envoy Gateway 'eg-gateway'
+# (namespace envoy-gateway-system); TLS is terminated there with the wildcard
+# *.<base_domain_name> certificate, so the chart needs no TLS secret. The route
+# reaches the gate (the pod's front door), not the agent.
+# ---------------------------------------------------------------------------
+httpRoute:
+  enabled: false
+  host: ""            # e.g. unified-decision-gate.solutions.ai  (<name>.<base_domain_name>)
+  path: /
+  gateway:
+    name: eg-gateway
+    namespace: envoy-gateway-system
+    sectionName: https
+  # The gateway-wide SecurityPolicy validates a LiteLLM key on every request.
+  # The gate enforces the DevUI bearer token (DEVUI_AUTH_TOKEN) itself, so by
+  # default the chart ships an empty route-level SecurityPolicy that opts this route out.
+  bypassGatewayAuth: true
+
+# ---------------------------------------------------------------------------
+# Chart-wide overrides
+# ---------------------------------------------------------------------------
+nameOverride: ""
+fullnameOverride: ""
