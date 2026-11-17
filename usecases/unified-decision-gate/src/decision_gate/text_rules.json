@@ -1,0 +1,57 @@
+{
+  "_about": "Text rules: questions that go straight to the LLM agent without asking System-1. Checked in order on the lower-cased question, after the gate's built-in check that it opens like a yes/no question; the first rule that matches decides, and its reason is logged and returned in X-Gate-Reason. A rule matches when ANY of its 'any' patterns matches, or when ALL of its 'all' patterns match (Python regular expressions, re.search). Add your own: append a rule with a new reason. Every rule should err toward the LLM: a question wrongly caught costs one LLM call; one wrongly let through gets a yes/no shown that may be meaningless. The gate refuses to start if a rule is malformed. To use a file of your own, set GATE_TEXT_RULES to its path.",
+  "rules": [
+    {
+      "reason": "not_yes_no:indirect_request",
+      "any": [
+        "^[^a-z']*(can|could|would|will|do)[^a-z']+you\\b"
+      ],
+      "example": "Can you explain how interest is worked out?",
+      "why": "Polite requests for information or for an action, not yes/no questions; also a second layer for the action check."
+    },
+    {
+      "reason": "needs_customer_data",
+      "any": [
+        "^\\s*(is|are|was|were|has|have|had|did)\\s+(my|mine|i)\\b|^\\s*do\\s+i\\s+(have|owe|qualify)\\b(?!\\s+the\\s+option)|^\\s*(does|do)\\s+my\\b|^\\s*am\\s+i\\b|^\\s*(is|are)\\s+there\\b.*\\b(on|in|to|for)\\s+my\\s+(account|card|loan|statement)s?\\b|\\b(i|we)\\s+(made|sent|paid|received|did|got)\\b"
+      ],
+      "example": "Is my card blocked?",
+      "why": "Questions about this customer's records: the gate has none, the agent has the MCP tools. Keyed on the opening, not on the word 'my': general policy questions in the first person ('Can I access my account from any branch?') stay with System-1."
+    },
+    {
+      "reason": "needs_agent:urgent_action",
+      "all": [
+        "\\b(block|unblock|freez|froze|clos|cancel|stop|transfer|withdr|report)\\w*\\b",
+        "\\b(now|immediately|right away|today|urgent|urgently|asap)\\b"
+      ],
+      "example": "Can my card be blocked right now?",
+      "why": "A request to act on an account or card now: a 'No.' to someone with a lost card is the worst answer this flow can give."
+    },
+    {
+      "reason": "needs_agent:capability_action",
+      "all": [
+        "^\\s*(can|could|should)\\s+i\\b|^\\s*is\\s+it\\s+possible\\s+to\\b",
+        "\\b(block|unblock|close|cancel|transfer|withdraw)\\w*\\b"
+      ],
+      "example": "Is it possible to block my card?",
+      "why": "A request to act, phrased as a question about what is possible: the agent's, not a bare yes/no. Shipped by default because the vLLM System-1 model's action veto carries no signal (SYSTEM1_MAX_P_ACTION=1.0). It errs toward the agent: it also catches information questions with an action verb. On the 391 test questions it matches 9, of which 8 are plain yes/no questions System-1 should answer ('Can I cancel a transaction') and 1 needs the agent but is already caught by the numbers rule; the requests it exists for do not occur in that set."
+    },
+    {
+      "reason": "needs_calculation",
+      "any": [
+        "[0-9%$€£₹]"
+      ],
+      "example": "Is 5% on $1000 more than $40?",
+      "why": "Numbers and amounts: System-1 is a classifier, not a calculator."
+    },
+    {
+      "reason": "not_yes_no:compound",
+      "any": [
+        "\\?[\\s\\S]*\\?",
+        ",\\s*and\\s+(how|what|why|when|where|which|who)\\b",
+        "\\?\\s*and\\s+(how|what|why|when|where|which|who)\\b"
+      ],
+      "example": "Is APR yearly? And how is it worked out?",
+      "why": "Two questions in one: a single yes or no cannot answer both."
+    }
+  ]
+}

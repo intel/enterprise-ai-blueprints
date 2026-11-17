@@ -46,6 +46,7 @@ litellm_allowed_namespaces:
   - ray-system
   - coding-agent-maf        # blueprint namespaces
   - banking-assistant
+  - unified-decision-gate
 ```
 
 Other switches in `config.agent-toolkit.yaml` that blueprints rely on:

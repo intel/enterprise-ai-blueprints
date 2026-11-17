@@ -1,0 +1,42 @@
+# End-to-end smoke-test overlay: swaps the LiteLLM gateway AND the System-1 vLLM for one stub, so the
+# REAL gate and agent images can be exercised without either. Not for production. To smoke-test
+# against the real System-1 vLLM instead, set E2E_SYSTEM1_URL (and E2E_SYSTEM1_MODEL).
+#
+#   docker compose -f docker-compose.yml -f docker-compose.e2e.yml up -d --wait
+#   python3 tests/e2e/smoke.py
+services:
+  stub-llm:
+    image: unified-decision-gate-gate:latest          # already has fastapi + uvicorn; the stub is mounted in
+    container_name: udg-stub-llm
+    command: ["python", "/stub/stub_llm.py"]
+    environment:
+      STUB_LLM_DELAY_MS: "${STUB_LLM_DELAY_MS:-0}"   # simulated model time, for latency tests
+    volumes:
+      - ./tests/e2e/stub_llm.py:/stub/stub_llm.py:ro
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4000/v1/models', timeout=3)"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  banking-assistant:
+    environment:
+      OPENAI_BASE_URL: "http://stub-llm:4000/v1"
+      MODEL_NAME: "stub-model"
+      no_proxy: "banking-mcp,redis-stack,stub-llm,localhost,127.0.0.1"
+      NO_PROXY: "banking-mcp,redis-stack,stub-llm,localhost,127.0.0.1"
+    depends_on:
+      stub-llm:
+        condition: service_healthy
+
+  gate:
+    environment:
+      GATE_DEBUG_HEADERS: "true"       # the smoke test reads X-Gate-Route
+      GATE_SHADOW_MODE: "false"        # the smoke test checks that System-1 answers
+      SYSTEM1_URL: "${E2E_SYSTEM1_URL:-http://stub-llm:4000}"
+      SYSTEM1_MODEL: "${E2E_SYSTEM1_MODEL:-stub-system1}"
+      no_proxy: "banking-assistant,${SYSTEM1_HOST:-},stub-llm,localhost,127.0.0.1"
+      NO_PROXY: "banking-assistant,${SYSTEM1_HOST:-},stub-llm,localhost,127.0.0.1"
+    depends_on:
+      stub-llm:
+        condition: service_healthy

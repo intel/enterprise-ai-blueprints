@@ -1,0 +1,9 @@
+# The gate: an OpenAI-compatible front door that answers simple yes/no questions with System-1 and
+# sends everything else to the full agent.
+# Deliberately tiny -- NO torch and NO model weights live here. The model runs in the
+# System-1 model (on vLLM, deployed by Intel Inference Toolkit), and this service only speaks HTTP to it.
+fastapi>=0.110.0
+uvicorn>=0.30.0
+
+# Async client for both upstreams: System-1's /v1/systemone and the agent.
+httpx>=0.27.0

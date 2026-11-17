@@ -1,0 +1,4 @@
+# Build context is ./src -- keep local artefacts out of the images.
+__pycache__/
+*.py[cod]
+.env

@@ -1,0 +1,6 @@
+# Model Context Protocol SDK — provides mcp.server.fastmcp.FastMCP.
+# NOTE: this is the official `mcp` package, NOT the standalone `fastmcp` project.
+mcp>=1.2.0,<2  # 2.x renamed FastMCP to MCPServer
+
+# ASGI server backing the Streamable HTTP transport.
+uvicorn>=0.30.0

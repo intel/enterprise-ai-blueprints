@@ -1,0 +1,30 @@
+# Agent Framework Core
+# Pinned to the version whose MCP client (agent_framework.MCPStreamableHTTPTool)
+# API was verified for this usecase.
+agent-framework-core==1.21.0   # 1.23.0 imports mcp.Client (mcp 2.x only) and breaks the MCP session
+
+# Agent Framework Extensions
+# DevUI is PINNED exactly: it is a pre-release whose HTTP API the gate translates to
+# (decision_gate/agent_client.py), verified against this version. 1.0.0b261008 serves the OpenAI
+# Responses API (/v1/responses) and NO /v1/chat/completions; it picks the agent by
+# metadata.entity_id and gives that entity a per-process random id. Re-verify before bumping.
+agent-framework-devui==1.0.0b261008   # Web UI + Responses API for the agent
+agent-framework-redis==1.0.0b261002   # Redis-based context provider for memory
+agent-framework-openai==1.16.0  # OpenAI-compatible API integration for chat completions
+
+# OpenAI (for OpenAI-compatible chat completions via LiteLLM)
+openai>=1.0.0
+
+# Model Context Protocol SDK — the Agent Framework's MCPStreamableHTTPTool client
+# imports the `mcp` package at connect time, so it is required in the agent image
+# (not only in the MCP server image).
+mcp>=1.2.0,<2  # 2.x renamed FastMCP to MCPServer
+
+# Redis Vector Library (used by the Redis context provider)
+redisvl>=0.1.0
+
+# Utilities
+python-dotenv>=1.0.0
+
+# Observability
+langfuse>=4.6.0

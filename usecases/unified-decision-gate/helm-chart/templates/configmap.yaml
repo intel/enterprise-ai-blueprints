@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "unified-decision-gate.fullname" . }}-config
+  labels:
+    {{- include "unified-decision-gate.labels" . | nindent 4 }}
+data:
+  OPENAI_BASE_URL: {{ .Values.agent.openaiBaseUrl | quote }}
+  LANGFUSE_HOST: {{ .Values.agent.langfuseHost | quote }}
+  LANGFUSE_ENABLE_SENSITIVE_DATA: {{ .Values.agent.langfuseEnableSensitiveData | quote }}
+  MODEL_NAME: {{ required "agent.modelName is required: the agent's LLM in LiteLLM" .Values.agent.modelName | quote }}
+  OPENAI_MODEL: {{ .Values.agent.modelName | quote }}
+  OPENAI_CHAT_COMPLETION_MODEL: {{ .Values.agent.modelName | quote }}
+  MCP_SERVER_URL: {{ .Values.agent.mcpServerUrl | quote }}
+  ENABLE_MEMORY: {{ .Values.agent.enableMemory | quote }}
+  AUTO_OPEN_BROWSER: "false"
+  PYTHONUNBUFFERED: "1"
+  no_proxy: {{ .Values.agent.noProxy | quote }}
+  NO_PROXY: {{ .Values.agent.noProxy | quote }}
